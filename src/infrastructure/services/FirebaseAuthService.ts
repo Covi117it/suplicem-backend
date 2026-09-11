@@ -6,14 +6,14 @@ import {
   FirebaseRefreshTokenResponseDto,
 } from "../../application/dtos/FirebaseDtos";
 
-const GOOGLE_API_URL = process.env.GOOGLE_API_URL;
-const SECURE_TOKEN_GOOGLE_API_URL = process.env.SECURE_TOKEN_GOOGLE_API_URL;
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY!;
+const getGoogleApiUrl = () => process.env.GOOGLE_API_URL || "https://identitytoolkit.googleapis.com/v1";
+const getSecureTokenGoogleApiUrl = () => process.env.SECURE_TOKEN_GOOGLE_API_URL || "https://securetoken.googleapis.com/v1";
+const getFirebaseApiKey = () => process.env.FIREBASE_API_KEY || "";
 
 export class FirebaseAuthService implements AuthService {
   async login(email: string, password: string) {
     const response = await axios.post<FirebaseLoginResponseDto>(
-      `${GOOGLE_API_URL}/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+      `${getGoogleApiUrl()}/accounts:signInWithPassword?key=${getFirebaseApiKey()}`,
       {
         email,
         password,
@@ -32,7 +32,7 @@ export class FirebaseAuthService implements AuthService {
 
   async refreshIdToken(refreshToken: string) {
     const response = await axios.post<FirebaseRefreshTokenResponseDto>(
-      `${SECURE_TOKEN_GOOGLE_API_URL}/token?key=${FIREBASE_API_KEY}`,
+      `${getSecureTokenGoogleApiUrl()}/token?key=${getFirebaseApiKey()}`,
       new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: refreshToken,
@@ -68,7 +68,7 @@ export class FirebaseAuthService implements AuthService {
 
   async sendVerificationEmail(idToken: string) {
     await axios.post(
-      `${GOOGLE_API_URL}/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
+      `${getGoogleApiUrl()}/accounts:sendOobCode?key=${getFirebaseApiKey()}`,
       {
         requestType: "VERIFY_EMAIL",
         idToken,
@@ -78,7 +78,7 @@ export class FirebaseAuthService implements AuthService {
 
   async sendPasswordResetEmail(email: string): Promise<void> {
     await axios.post(
-      `${GOOGLE_API_URL}/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
+      `${getGoogleApiUrl()}/accounts:sendOobCode?key=${getFirebaseApiKey()}`,
       {
         requestType: "PASSWORD_RESET",
         email,

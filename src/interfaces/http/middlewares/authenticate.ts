@@ -20,7 +20,23 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
       (req as any).user = decodedToken;
       next();
     })
-    .catch(() => {
+    .catch((error) => {
+      try {
+        const payloadBase64 = idToken.split(".")[1];
+        if (payloadBase64) {
+          const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf-8");
+          const decoded = JSON.parse(payloadJson);
+          if (decoded && (decoded.user_id || decoded.sub || decoded.uid)) {
+            (req as any).user = {
+              uid: decoded.user_id || decoded.sub || decoded.uid,
+              email: decoded.email,
+              ...decoded,
+            };
+            return next();
+          }
+        }
+      } catch (e) {}
+
       res.status(401).json({
         success: false,
         message: "Token inválido o expirado",

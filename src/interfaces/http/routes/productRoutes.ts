@@ -8,4 +8,6 @@ export const productRoutes = (router: Router) => {
   router.post("/products", authenticate, (req, res) => productController.create(req, res));
   router.get("/products", authenticate, (req, res) => productController.getAll(req, res));
   router.get("/products/search", (req, res) => productController.search(req, res));
+  router.put("/products/:id", authenticate, (req, res) => productController.update(req, res));
+  router.delete("/products/:id", authenticate, (req, res) => productController.delete(req, res));
 };

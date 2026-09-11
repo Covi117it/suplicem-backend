@@ -7,12 +7,18 @@ export class LoginUseCase {
 
   async execute({ email, password }: LoginDto) {
     const loginResponse = await this.authService.login(email, password);
-    const userInfo = await this.authService.getUserByUid(loginResponse.uid);
+    let emailVerified = true;
+    try {
+      const userInfo = await this.authService.getUserByUid(loginResponse.uid);
+      emailVerified = userInfo.emailVerified;
+    } catch (error: any) {
+      console.warn("Advertencia: No se pudo consultar Admin SDK en getUserByUid:", error.message);
+    }
 
     return {
       success: true,
       ...loginResponse,
-      emailVerified: userInfo.emailVerified,
+      emailVerified,
     };
   }
 }

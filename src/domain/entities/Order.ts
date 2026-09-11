@@ -8,7 +8,7 @@ export interface DeliveryDetail {
   status?: "pending" | "delivered";
   images?: string[];
   comment?: string;
-  productName?: string; // para enriquecer luego si quieres
+  productName?: string;
 }
 
 export interface OrderItem {
@@ -28,8 +28,12 @@ export interface Order {
   deliveries: DeliveryDetail[];
   items: OrderItem[];
   comments?: string;
+  receiptImage?: string;
   status: "pending" | "approved" | "rejected";
   rejectionReason?: string;
   createdAt: string;
   tripId?: string;
+  aiRiskFlag?: boolean;
+  aiRiskScore?: number;
+  aiRiskReason?: string;
 }

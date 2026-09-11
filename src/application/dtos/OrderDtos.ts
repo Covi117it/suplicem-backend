@@ -12,4 +12,5 @@ export interface CreateOrderDto {
   }[];
   items: OrderItem[];
   comments?: string;
+  receiptImage?: string;
 }

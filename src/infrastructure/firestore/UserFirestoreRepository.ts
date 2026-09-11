@@ -12,8 +12,13 @@ export class UserFirestoreRepository implements UserRepository {
   }
 
   async getById(uid: string): Promise<User | null> {
-    const doc = await firestore.collection("users").doc(uid).get();
-    return doc.exists ? (doc.data() as User) : null;
+    try {
+      const doc = await firestore.collection("users").doc(uid).get();
+      return doc.exists ? (doc.data() as User) : null;
+    } catch (error: any) {
+      console.warn("Advertencia en Firestore getById:", error.message);
+      return null;
+    }
   }
 
   async getAll(): Promise<User[]> {

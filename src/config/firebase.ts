@@ -22,10 +22,12 @@ if (!getApps().length) {
 
   admin.initializeApp({
     credential,
+    projectId: process.env.FIREBASE_PROJECT_ID || "suplicem-ce464",
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "suplicem-ce464.firebasestorage.app",
   });
 }
 
 export const firestore = admin.firestore();
+firestore.settings({ ignoreUndefinedProperties: true });
 export const auth = admin.auth();
 export const storage = admin.storage();

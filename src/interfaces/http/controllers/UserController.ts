@@ -20,10 +20,16 @@ export class UserController {
       await createUserUseCase.execute(req.body);
       res
         .status(201)
-        .json({ message: "Usuario creado y verificación enviada" });
+        .json({ success: true, message: "Usuario creado y verificación enviada" });
     } catch (error: any) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
+      console.error("Error en UserController.create:", error);
+      let errorMsg = error.message || "Error al crear el usuario";
+      if (errorMsg.includes("The email address is already in use")) {
+        errorMsg = "El correo electrónico ya se encuentra registrado por otro usuario.";
+      } else if (errorMsg.includes("Password must be at least 6 characters")) {
+        errorMsg = "La contraseña debe tener al menos 6 caracteres.";
+      }
+      res.status(400).json({ success: false, message: errorMsg, error: errorMsg });
     }
   }
 

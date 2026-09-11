@@ -22,10 +22,21 @@ export class AuthController {
       const result = await loginUseCase.execute({ email, password });
       res.status(200).json(result);
     } catch (error: any) {
+      console.error("Error en login:", error?.response?.data || error.message);
+      const rawMessage = error.response?.data?.error?.message;
+      let message = "Error al iniciar sesión";
+      if (rawMessage === "INVALID_LOGIN_CREDENTIALS" || rawMessage === "INVALID_PASSWORD" || rawMessage === "EMAIL_NOT_FOUND") {
+        message = "Correo o contraseña incorrectos";
+      } else if (rawMessage === "USER_DISABLED") {
+        message = "La cuenta de usuario ha sido deshabilitada";
+      } else if (rawMessage === "TOO_MANY_ATTEMPTS_TRY_LATER") {
+        message = "Acceso bloqueado temporalmente por demasiados intentos fallidos";
+      } else if (rawMessage) {
+        message = rawMessage;
+      }
       res.status(400).json({
         success: false,
-        message:
-          error.response?.data?.error?.message || "Error al iniciar sesión",
+        message,
       });
     }
   }

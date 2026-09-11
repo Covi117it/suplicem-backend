@@ -76,10 +76,12 @@ export class OrderFirestoreRepository implements OrderRepository {
       const counterDoc = await tx.get(counterRef);
 
       if (!counterDoc.exists) {
-        throw new Error("Contador de órdenes no inicializado");
+        const initial = 1001;
+        tx.set(counterRef, { current: initial });
+        return initial;
       }
 
-      const current = counterDoc.data()!.current || 0;
+      const current = counterDoc.data()?.current || 1000;
       const next = current + 1;
 
       tx.update(counterRef, { current: next });

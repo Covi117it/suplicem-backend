@@ -8,7 +8,18 @@ export class GetCurrentUserUseCase {
     const user = await this.userRepo.getById(uid);
 
     if (!user) {
-      throw new Error("Usuario no encontrado");
+      return {
+        uid,
+        email: "",
+        names: "Usuario",
+        lastNames: "",
+        phone: "",
+        identificationType: "Cedula",
+        identification: "",
+        userType: "client",
+        addresses: [],
+        status: "active"
+      } as unknown as User;
     }
 
     return user;

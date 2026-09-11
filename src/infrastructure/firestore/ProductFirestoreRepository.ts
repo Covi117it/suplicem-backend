@@ -9,30 +9,46 @@ export class ProductFirestoreRepository implements ProductRepository {
   }
 
   async getAll(): Promise<Product[]> {
-    const snapshot = await firestore.collection("products").get();
-
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Product[];
+    try {
+      const snapshot = await firestore.collection("products").get();
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Product[];
+    } catch (error: any) {
+      console.warn("Advertencia en Firestore Product.getAll:", error.message);
+      return [];
+    }
   }
 
   async search(query?: string): Promise<Product[]> {
-    let ref: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
-      firestore.collection("products");
+    try {
+      let ref: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
+        firestore.collection("products");
 
-    if (query) {
-      // Convertimos a minúscula y usamos el prefijo para búsqueda básica
-      ref = ref
-        .where("name", ">=", query.toLowerCase())
-        .where("name", "<=", query.toLowerCase() + "\uf8ff");
+      if (query) {
+        ref = ref
+          .where("name", ">=", query.toLowerCase())
+          .where("name", "<=", query.toLowerCase() + "\uf8ff");
+      }
+
+      const snapshot = await ref.get();
+
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Product[];
+    } catch (error: any) {
+      console.warn("Advertencia en Firestore Product.search:", error.message);
+      return [];
     }
+  }
 
-    const snapshot = await ref.get();
+  async update(id: string, productData: Partial<Product>): Promise<void> {
+    await firestore.collection("products").doc(id).update(productData);
+  }
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Product[];
+  async delete(id: string): Promise<void> {
+    await firestore.collection("products").doc(id).delete();
   }
 }

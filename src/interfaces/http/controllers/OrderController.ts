@@ -25,7 +25,7 @@ const markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(
 export class OrderController {
   async create(req: Request, res: Response) {
     try {
-      const { deliveryType, deliveries, items, comments } = req.body;
+      const { deliveryType, deliveries, items, comments, receiptImage } = req.body;
       const userId = req.user?.uid;
 
       if (!userId || !deliveryType || !items || items.length === 0) {
@@ -41,6 +41,7 @@ export class OrderController {
         deliveries,
         items,
         comments,
+        receiptImage,
       });
 
       // try {
