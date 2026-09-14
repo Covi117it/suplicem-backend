@@ -1,7 +1,19 @@
 import { Request, Response, NextFunction } from "express";
-import { auth } from "../../../config/firebase";
+import { auth, firestore } from "../../../config/firebase";
 
-export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
+export interface AuthenticatedUser {
+  uid: string;
+  email?: string;
+  userType: "client" | "driver" | "admin";
+  status?: string;
+  [key: string]: any;
+}
+
+export const authenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -14,32 +26,30 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
 
   const idToken = authHeader.split(" ")[1];
 
-  auth
-    .verifyIdToken(idToken)
-    .then((decodedToken) => {
-      (req as any).user = decodedToken;
-      next();
-    })
-    .catch((error) => {
-      try {
-        const payloadBase64 = idToken.split(".")[1];
-        if (payloadBase64) {
-          const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf-8");
-          const decoded = JSON.parse(payloadJson);
-          if (decoded && (decoded.user_id || decoded.sub || decoded.uid)) {
-            (req as any).user = {
-              uid: decoded.user_id || decoded.sub || decoded.uid,
-              email: decoded.email,
-              ...decoded,
-            };
-            return next();
-          }
-        }
-      } catch (e) {}
+  try {
+    // 1. Verificación criptográfica estricta con Firebase Admin
+    const decodedToken = await auth.verifyIdToken(idToken);
 
-      res.status(401).json({
-        success: false,
-        message: "Token inválido o expirado",
-      });
+    // 2. Obtener el rol y estado real del usuario desde Firestore
+    const userDoc = await firestore
+      .collection("users")
+      .doc(decodedToken.uid)
+      .get();
+    const userData = userDoc.data();
+
+    (req as any).user = {
+      ...decodedToken,
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      userType: userData?.userType || "client",
+      status: userData?.status || "pending",
+    } as AuthenticatedUser;
+
+    next();
+  } catch (error: any) {
+    res.status(401).json({
+      success: false,
+      message: "Token inválido o expirado",
     });
+  }
 };

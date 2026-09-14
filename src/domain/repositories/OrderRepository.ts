@@ -12,4 +12,11 @@ export interface OrderRepository {
     reason?: string
   ): Promise<void>;
   markDeliveryAsCompleted(orderId: string, index: number): Promise<void>;
+
+  completeDelivery(
+    orderId: string,
+    index: number,
+    data: { comment?: string; imageUrl?: string }
+  ): Promise<void>;
+  markDeliveryAsCompleted(orderId: string, index: number): Promise<void>;
 }

@@ -4,13 +4,20 @@ import { Address } from "../../domain/entities/User";
 export interface CreateOrderDto {
   userId: string;
   deliveryType: "almacen" | "domicilio";
-  deliveries: {
+  deliveries?: {
     productId: string;
     address?: Address;
     quantity: number;
     unit: string;
   }[];
-  items: OrderItem[];
+  items: {
+    productId: string;
+    quantity: number;
+    name?: string;
+    unit?: string;
+    unitPrice?: number;
+    subtotal?: number;
+  }[];
   comments?: string;
   receiptImage?: string;
 }

@@ -44,6 +44,20 @@ export class ProductFirestoreRepository implements ProductRepository {
     }
   }
 
+  async findById(id: string): Promise<Product | null> {
+    try {
+      const doc = await firestore.collection("products").doc(id).get();
+      if (!doc.exists) return null;
+      return {
+        id: doc.id,
+        ...doc.data(),
+      } as Product;
+    } catch (error: any) {
+      console.warn("Advertencia en Firestore Product.findById:", error.message);
+      return null;
+    }
+  }
+
   async update(id: string, productData: Partial<Product>): Promise<void> {
     await firestore.collection("products").doc(id).update(productData);
   }
