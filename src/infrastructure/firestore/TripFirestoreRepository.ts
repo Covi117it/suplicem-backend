@@ -13,7 +13,6 @@ export class TripFirestoreRepository implements TripRepository {
     const snapshot = await firestore
       .collection("trips")
       .where("status", "==", "available")
-      // .orderBy("createdAt", "desc")
       .get();
 
     return snapshot.docs.map((doc) => ({
@@ -55,9 +54,27 @@ export class TripFirestoreRepository implements TripRepository {
   }
 
   async assignDriver(tripId: string, driverId: string): Promise<void> {
-    await firestore.collection("trips").doc(tripId).update({
-      status: "accepted",
-      assignedDriverId: driverId,
+    const tripRef = firestore.collection("trips").doc(tripId);
+
+    await firestore.runTransaction(async (transaction) => {
+      const tripDoc = await transaction.get(tripRef);
+
+      if (!tripDoc.exists) {
+        throw new Error("El viaje solicitado no existe");
+      }
+
+      const tripData = tripDoc.data();
+      if (tripData?.status !== "available") {
+        throw new Error(
+          `El viaje ${tripData?.tripNumber || tripId} ya fue tomado por otro conductor.`
+        );
+      }
+
+      transaction.update(tripRef, {
+        status: "accepted",
+        assignedDriverId: driverId,
+        acceptedAt: new Date().toISOString(),
+      });
     });
   }
 
@@ -117,10 +134,8 @@ export class TripFirestoreRepository implements TripRepository {
         orders.push(...chunkOrders);
       }
 
-      // 🔍 Reunimos todos los userIds únicos
       const userIds = [...new Set(orders.map((o) => o.userId).filter(Boolean))];
 
-      // 🔄 Los consultamos en chunks (máximo 10 por `in`)
       const userChunks = this.chunkArray(userIds, 10);
       const userMap = new Map<string, any>();
 
@@ -135,7 +150,6 @@ export class TripFirestoreRepository implements TripRepository {
         });
       }
 
-      // 🎯 Enriquecemos las órdenes con la info del usuario
       orders = orders.map((order) => {
         const user = userMap.get(order.userId);
         return {
@@ -164,7 +178,6 @@ export class TripFirestoreRepository implements TripRepository {
     assignedDriverId: string;
     driver: any | null;
   } | null> {
-    // 2. Buscar el trip que contenga esa orden en su array `orderIds`
     const tripSnap = await firestore
       .collection("trips")
       .where("orderIds", "array-contains", orderId)
@@ -178,7 +191,6 @@ export class TripFirestoreRepository implements TripRepository {
     const tripDoc = tripSnap.docs[0];
     const tripData = tripDoc.data();
 
-    // 3. Buscar la información del conductor asignado
     let driverData: any = null;
     const assignedDriverId = tripData.assignedDriverId;
 
@@ -195,7 +207,6 @@ export class TripFirestoreRepository implements TripRepository {
       }
     }
 
-    // 4. Retornar solo los datos requeridos
     return {
       id: tripDoc.id,
       tripNumber: tripData.tripNumber,

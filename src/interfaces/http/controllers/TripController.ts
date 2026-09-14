@@ -10,6 +10,8 @@ import { GetDriverTripHistoryUseCase } from "../../../application/use-cases/trip
 import { GetTripByIdUseCase } from "../../../application/use-cases/trip/GetTripByIdUseCase";
 import { GetDriverActualTripsUseCase } from "../../../application/use-cases/trip/GetDriverActualTripsUseCase";
 import { GetTripByOrderIdUseCase } from "../../../application/use-cases/trip/GetTripByOrderIdUseCase";
+import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/GetDriverActiveTripUseCase";
+
 
 const tripRepo = new TripFirestoreRepository();
 const createTripUseCase = new CreateTripUseCase(tripRepo);
@@ -22,6 +24,7 @@ const getTripDetailsUseCase = new GetTripDetailsUseCase(tripRepo);
 const getTripByOrderIdUseCase = new GetTripByOrderIdUseCase(tripRepo);
 const updateTripStatusUseCase = new UpdateTripStatusUseCase(tripRepo);
 const getTripByIdUseCase = new GetTripByIdUseCase(tripRepo);
+const getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo);
 
 export class TripController {
   async create(req: Request, res: Response) {
@@ -197,6 +200,29 @@ export class TripController {
       res.status(404).json({
         success: false,
         message: error.message || "Error al obtener el viaje",
+      });
+    }
+  }
+
+   async getDriverActiveTrip(req: Request, res: Response) {
+    try {
+      const userId = req.user?.uid;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Usuario no autenticado",
+        });
+      }
+      const trip = await getDriverActiveTripUseCase.execute(userId);
+      res.status(200).json({
+        success: true,
+        hasActiveTrip: Boolean(trip),
+        trip,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error al obtener el viaje activo",
       });
     }
   }

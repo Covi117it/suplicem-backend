@@ -9,12 +9,20 @@ import { uploadDeliveryImage } from "../../../domain/services/ImageStorageServic
 import { firestore } from "../../../config/firebase";
 import { GetOrderByIdUseCase } from "../../../application/use-cases/order/GetOrderByIdUseCase";
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
-import { sendEmail } from "../../../infrastructure/services/EmailService";
+import { GetOrderTrackingUseCase } from "../../../application/use-cases/order/GetOrderTrackingUseCase";
+import { LocationFirestoreRepository } from "../../../infrastructure/firestore/LocationFirestoreRepository";
+import { ProductFirestoreRepository } from "../../../infrastructure/firestore/ProductFirestoreRepository";
+import { TripFirestoreRepository } from "../../../infrastructure/firestore/TripFirestoreRepository";
+
+const tripRepo = new TripFirestoreRepository();
+const locationRepo = new LocationFirestoreRepository();
 
 const orderRepo = new OrderFirestoreRepository();
 const userRepo = new UserFirestoreRepository();
-const createOrderUseCase = new CreateOrderUseCase(orderRepo);
+const productRepo = new ProductFirestoreRepository();
+const createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo);
 const getMyOrdersUseCase = new GetMyOrdersUseCase(orderRepo, userRepo);
+const getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo);
 const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo);
 const getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo);
 const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo);
@@ -67,9 +75,33 @@ export class OrderController {
     }
   }
 
-  async getMyOrders(req: Request, res: Response) {
+  async getTracking(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const tracking = await getOrderTrackingUseCase.execute(id);
+      if (!tracking) {
+        return res.status(404).json({
+          success: false,
+          message: "Orden no encontrada",
+        });
+      }
+      res.status(200).json({
+        success: true,
+        tracking,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error al obtener el tracking de la orden",
+      });
+    }
+  }
+
+
+   async getMyOrders(req: Request, res: Response) {
     try {
       const userId = req.user?.uid;
+      const { search, status } = req.query;
 
       if (!userId) {
         return res.status(401).json({
@@ -78,7 +110,10 @@ export class OrderController {
         });
       }
 
-      const orders = await getMyOrdersUseCase.execute(userId);
+      const orders = await getMyOrdersUseCase.execute(userId, {
+        search: typeof search === "string" ? search : undefined,
+        status: typeof status === "string" ? status : undefined,
+      });
 
       res.status(200).json({
         success: true,
@@ -178,6 +213,41 @@ export class OrderController {
       res.status(400).json({
         success: false,
         message: error.message || "Error al actualizar la entrega",
+      });
+    }
+  }
+
+  async completeDeliveryWithProof(req: Request, res: Response) {
+    try {
+      const { id, index } = req.params;
+      const parsedIndex = parseInt(index, 10);
+      const comment = req.body.comment;
+      const image = req.file;
+      if (isNaN(parsedIndex)) {
+        return res.status(400).json({
+          success: false,
+          message: "Índice de entrega inválido",
+        });
+      }
+      let imageUrl: string | undefined;
+      if (image) {
+        imageUrl = await uploadDeliveryImage(image, id, parsedIndex);
+      }
+      await markDeliveryCompletedUseCase.execute({
+        orderId: id,
+        index: parsedIndex,
+        comment,
+        imageUrl,
+      });
+      res.status(200).json({
+        success: true,
+        message: "Entrega completada y comprobante guardado exitosamente",
+        imageUrl,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error al completar la entrega",
       });
     }
   }
