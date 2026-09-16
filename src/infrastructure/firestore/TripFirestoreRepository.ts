@@ -79,8 +79,79 @@ export class TripFirestoreRepository implements TripRepository {
   }
 
   async updateTripStatus(tripId: string, status: string): Promise<void> {
-    await firestore.collection("trips").doc(tripId).update({
-      status: status,
+    if (status === "completed") {
+      await this.completeTrip(tripId);
+    } else {
+      await firestore.collection("trips").doc(tripId).update({
+        status: status,
+      });
+    }
+  }
+
+  async completeTrip(tripId: string): Promise<void> {
+    await firestore.runTransaction(async (transaction) => {
+      const tripRef = firestore.collection("trips").doc(tripId);
+      const tripSnap = await transaction.get(tripRef);
+
+      if (!tripSnap.exists) {
+        throw new Error("Viaje no encontrado");
+      }
+
+      const tripData = tripSnap.data() as Trip;
+
+      // Idempotencia: Si el viaje ya se encuentra completado, no volver a aplicar cambios
+      if (tripData.status === "completed") {
+        return;
+      }
+
+      const orderIds = tripData.orderIds || [];
+
+      // 1. Leer todas las órdenes de forma atómica dentro de la transacción
+      const orderRefs = orderIds.map((id) => firestore.collection("orders").doc(id));
+      const orderSnaps = await Promise.all(orderRefs.map((ref) => transaction.get(ref)));
+
+      // 2. Validar que todas las entregas estén marcadas como "delivered"
+      for (let i = 0; i < orderSnaps.length; i++) {
+        const orderSnap = orderSnaps[i];
+        if (orderSnap.exists) {
+          const orderData = orderSnap.data();
+          const deliveries = orderData?.deliveries || [];
+
+          const allDelivered =
+            deliveries.length > 0 &&
+            deliveries.every(
+              (del: any) => del.status === "delivered" || del.delivered === true
+            );
+
+          if (!allDelivered) {
+            throw new Error(
+              "No se puede completar el viaje: hay entregas pendientes"
+            );
+          }
+        }
+      }
+
+      // 3. Actualizar el viaje a "completed"
+      transaction.update(tripRef, { status: "completed" });
+
+      // 4. Completar las órdenes cuyos repartos estén 100% entregados
+      for (let i = 0; i < orderSnaps.length; i++) {
+        const orderSnap = orderSnaps[i];
+        if (orderSnap.exists) {
+          const orderData = orderSnap.data();
+          const deliveries = orderData?.deliveries || [];
+
+          const allDelivered =
+            deliveries.length > 0 &&
+            deliveries.every(
+              (del: any) => del.status === "delivered" || del.delivered === true
+            );
+
+          if (allDelivered && orderData?.status !== "completed") {
+            transaction.update(orderRefs[i], { status: "completed" });
+          }
+        }
+      }
     });
   }
 
@@ -214,6 +285,74 @@ export class TripFirestoreRepository implements TripRepository {
       assignedDriverId,
       driver: driverData,
     };
+  }
+
+  async createWithOrders(data: {
+    tripNumber: string;
+    orderIds: string[];
+    driverId?: string;
+    totalTons: number;
+    comments?: string;
+    deliveries?: any[];
+  }): Promise<string> {
+    return await firestore.runTransaction(async (transaction) => {
+      const orderRefs = data.orderIds.map((id) =>
+        firestore.collection("orders").doc(id)
+      );
+
+      // 1. Lectura de todas las órdenes en la transacción
+      const orderSnaps = await Promise.all(
+        orderRefs.map((ref) => transaction.get(ref))
+      );
+
+      for (let i = 0; i < orderSnaps.length; i++) {
+        const snap = orderSnaps[i];
+        if (!snap.exists) {
+          throw new Error(`Orden ${data.orderIds[i]} no encontrada`);
+        }
+        const orderData = snap.data();
+        const items = orderData?.items || [];
+        const existingDeliveries = orderData?.deliveries || [];
+
+        // Validar disponibilidad por producto
+        for (const item of items) {
+          const pedida = Number(item.quantity) || 0;
+          const entregada = existingDeliveries.reduce((sum: number, del: any) => {
+            if (
+              del.productId === item.productId &&
+              (del.status === "delivered" || del.delivered === true)
+            ) {
+              return sum + (Number(del.quantity) || 0);
+            }
+            return sum;
+          }, 0);
+          const reservadaActiva = 0;
+          const disponible = pedida - (entregada + reservadaActiva);
+
+          if (disponible < 0) {
+            throw new Error(
+              `Sin disponibilidad suficiente para el producto ${item.name || item.productId} en la orden ${orderData?.orderNumber || data.orderIds[i]}`
+            );
+          }
+        }
+      }
+
+      // 2. Creación del viaje y actualización atómica
+      const tripRef = firestore.collection("trips").doc();
+      const newTrip = {
+        tripNumber: data.tripNumber,
+        orderIds: data.orderIds,
+        assignedDriverId: data.driverId || "",
+        totalTons: data.totalTons,
+        comments: data.comments || "",
+        status: data.driverId ? "accepted" : "available",
+        createdAt: new Date().toISOString(),
+      };
+
+      transaction.set(tripRef, newTrip);
+
+      return tripRef.id;
+    });
   }
 
   private chunkArray<T>(arr: T[], size: number): T[][] {

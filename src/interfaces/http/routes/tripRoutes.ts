@@ -28,6 +28,11 @@ export const tripRoutes = (router: Router) => {
     }
   );
 
+  // 1b. Crear viaje con órdenes asociadas
+  router.post("/trips/create-with-orders", authenticate, async (req, res) => {
+    await tripController.createWithOrders(req, res);
+  });
+
   // 2. Actualizar estado del viaje (Conductores y Administradores)
   router.post(
     "/trips/status/update",
@@ -38,6 +43,10 @@ export const tripRoutes = (router: Router) => {
       await tripController.updateTripStatus(req, res);
     }
   );
+
+  router.patch("/trips/:id/status", authenticate, async (req, res) => {
+    await tripController.updateTripStatus(req, res);
+  });
 
   // 3. Ver todos los viajes (Solo Administradores)
   router.get(

@@ -17,10 +17,40 @@ const updateUserUseCase = new UpdateUserUseCase(userRepo);
 export class UserController {
   async create(req: Request, res: Response) {
     try {
-      await createUserUseCase.execute(req.body);
-      res
-        .status(201)
-        .json({ success: true, message: "Usuario creado y verificación enviada" });
+      const file =
+        req.file ||
+        (Array.isArray((req as any).files) && (req as any).files.length > 0
+          ? (req as any).files[0]
+          : undefined);
+
+      let userData: any = req.body || {};
+
+      if (userData && userData.data) {
+        if (typeof userData.data === "string") {
+          try {
+            const parsed = JSON.parse(userData.data);
+            userData = { ...parsed, ...userData };
+          } catch (e) {
+            console.warn("No se pudo parsear req.body.data como JSON:", e);
+          }
+        } else if (typeof userData.data === "object") {
+          userData = { ...userData.data, ...userData };
+        }
+      } else if (typeof userData === "string") {
+        try {
+          userData = JSON.parse(userData);
+        } catch (e) {}
+      }
+
+      console.log("📥 Petición de registro recibida en /api/users");
+      console.log("🔑 Email recibido:", userData?.email || userData?.data?.email);
+
+      const result = await createUserUseCase.execute(userData, file);
+      res.status(201).json({
+        success: true,
+        message: "Usuario creado y verificación enviada",
+        ...(result || {}),
+      });
     } catch (error: any) {
       console.error("Error en UserController.create:", error);
       let errorMsg = error.message || "Error al crear el usuario";

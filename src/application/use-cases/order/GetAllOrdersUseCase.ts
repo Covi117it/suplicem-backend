@@ -13,13 +13,25 @@ export class GetAllOrdersUseCase {
 
     const enrichedOrders: EnrichedOrder[] = await Promise.all(
       orders.map(async (order) => {
-        const user = await this.userRepo.getById(order.userId);
+        try {
+          if (!order.userId || typeof order.userId !== "string" || !order.userId.trim()) {
+            return {
+              ...order,
+              userNames: (order as any).userNames || "",
+              userLastNames: (order as any).userLastNames || "",
+            };
+          }
+          const user = await this.userRepo.getById(order.userId);
 
-        return {
-          ...order,
-          userNames: user?.names,
-          userLastNames: user?.lastNames,
-        };
+          return {
+            ...order,
+            userNames: user?.names || (order as any).userNames || "",
+            userLastNames: user?.lastNames || (order as any).userLastNames || "",
+          };
+        } catch (error) {
+          console.warn(`Error al enriquecer orden ${order.id}:`, error);
+          return order as EnrichedOrder;
+        }
       })
     );
 

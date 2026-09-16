@@ -24,4 +24,5 @@ export interface AuthService {
   sendPasswordResetEmail(email: string): Promise<void>;
   getUserByUid(uid: string): Promise<{ emailVerified: boolean }>;
   sendPushNotification(token: string, title: string, body: string): Promise<void>;
+  deleteUser(uid: string): Promise<void>;
 }

@@ -11,12 +11,14 @@ export interface OrderRepository {
     status: "approved" | "rejected",
     reason?: string
   ): Promise<void>;
-  markDeliveryAsCompleted(orderId: string, index: number): Promise<void>;
-
   completeDelivery(
     orderId: string,
     index: number,
     data: { comment?: string; imageUrl?: string }
   ): Promise<void>;
-  markDeliveryAsCompleted(orderId: string, index: number): Promise<void>;
+  updateDeliveries(
+    orderId: string,
+    deliveryType: string,
+    deliveries: any[]
+  ): Promise<any>;
 }

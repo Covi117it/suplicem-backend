@@ -5,6 +5,7 @@ import { GetMyOrdersUseCase } from "../../../application/use-cases/order/GetMyOr
 import { GetAllOrdersUseCase } from "../../../application/use-cases/order/GetAllOrdersUseCase";
 import { UpdateOrderStatusUseCase } from "../../../application/use-cases/order/UpdateOrderStatusUseCase";
 import { MarkDeliveryCompletedUseCase } from "../../../application/use-cases/order/MarkDeliveryCompletedUseCase";
+import { UpdateOrderDeliveriesUseCase } from "../../../application/use-cases/order/UpdateOrderDeliveriesUseCase";
 import { uploadDeliveryImage } from "../../../domain/services/ImageStorageService";
 import { firestore } from "../../../config/firebase";
 import { GetOrderByIdUseCase } from "../../../application/use-cases/order/GetOrderByIdUseCase";
@@ -27,6 +28,9 @@ const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo);
 const getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo);
 const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo);
 const markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(
+  orderRepo
+);
+const updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(
   orderRepo
 );
 
@@ -297,6 +301,37 @@ export class OrderController {
       res.status(500).json({
         success: false,
         message: error.message || "Error al actualizar la entrega",
+      });
+    }
+  }
+
+  async updateDeliveries(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { deliveryType, deliveries } = req.body;
+
+      if (!id || !deliveryType) {
+        return res.status(400).json({
+          success: false,
+          message: "id y deliveryType son requeridos",
+        });
+      }
+
+      const updatedOrder = await updateOrderDeliveriesUseCase.execute(
+        id,
+        deliveryType,
+        deliveries
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Entregas actualizadas y guardadas correctamente",
+        order: updatedOrder,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Error al actualizar las entregas",
       });
     }
   }

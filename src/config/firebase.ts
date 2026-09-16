@@ -15,6 +15,9 @@ if (!getApps().length) {
     });
   } else if (fs.existsSync(keysPath)) {
     const serviceAccount = JSON.parse(fs.readFileSync(keysPath, "utf8"));
+    if (serviceAccount.private_key && typeof serviceAccount.private_key === "string") {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
     credential = admin.credential.cert(serviceAccount);
   } else {
     credential = admin.credential.applicationDefault();

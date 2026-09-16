@@ -9,6 +9,7 @@ export interface TripRepository {
   getDriverActualTrips(userId: string): Promise<Trip[]>;
   assignDriver(tripId: string, driverId: string): Promise<void>;
   updateTripStatus(tripId: string, status: string): Promise<void>;
+  completeTrip(tripId: string): Promise<void>;
   getByIdWithOrders(tripId: string): Promise<Trip & { orders: any[] }>;
   getTripByOrderId(orderId: string): Promise<{
     id: string;
@@ -17,4 +18,5 @@ export interface TripRepository {
     assignedDriverId: string;
     driver: any | null;
   } | null>;
+  createWithOrders(data: any): Promise<string>;
 }

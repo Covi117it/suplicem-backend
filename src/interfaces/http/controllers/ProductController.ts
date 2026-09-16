@@ -52,6 +52,7 @@ export class ProductController {
   async search(req: Request, res: Response) {
     try {
       const { search } = req.query;
+      console.log(`[SEARCH] Buscando productos con query: "${req.query.search}"`);
 
       const products = await searchProductsUseCase.execute(
         typeof search === "string" ? search : undefined

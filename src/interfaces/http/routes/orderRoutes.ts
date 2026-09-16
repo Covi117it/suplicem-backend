@@ -57,7 +57,16 @@ export const orderRoutes = (router: Router) => {
     }
   );
 
-  // 6. Marcar entrega completada (Conductores y Administradores)
+  // 6. Asignar/actualizar entregas (Administradores)
+  router.put("/orders/:id/deliveries", authenticate, async (req, res) => {
+    await orderController.updateDeliveries(req, res);
+  });
+
+  router.patch("/orders/:id/deliveries", authenticate, async (req, res) => {
+    await orderController.updateDeliveries(req, res);
+  });
+
+  // 7. Marcar entrega completada (Conductores y Administradores)
   router.patch(
     "/orders/:id/deliveries/:index",
     authenticate,

@@ -11,10 +11,12 @@ import { GetTripByIdUseCase } from "../../../application/use-cases/trip/GetTripB
 import { GetDriverActualTripsUseCase } from "../../../application/use-cases/trip/GetDriverActualTripsUseCase";
 import { GetTripByOrderIdUseCase } from "../../../application/use-cases/trip/GetTripByOrderIdUseCase";
 import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/GetDriverActiveTripUseCase";
-
+import { CompleteTripUseCase } from "../../../application/use-cases/trip/CompleteTripUseCase";
+import { CreateTripWithOrdersUseCase } from "../../../application/use-cases/trip/CreateTripWithOrdersUseCase";
 
 const tripRepo = new TripFirestoreRepository();
 const createTripUseCase = new CreateTripUseCase(tripRepo);
+const createTripWithOrdersUseCase = new CreateTripWithOrdersUseCase(tripRepo);
 const getAvailableTripsUseCase = new GetAvailableTripsUseCase(tripRepo);
 const getDriverTripHistoryUseCase = new GetDriverTripHistoryUseCase(tripRepo);
 const getDriverActualTripsUseCase = new GetDriverActualTripsUseCase(tripRepo);
@@ -23,6 +25,7 @@ const acceptTripUseCase = new AcceptTripUseCase(tripRepo);
 const getTripDetailsUseCase = new GetTripDetailsUseCase(tripRepo);
 const getTripByOrderIdUseCase = new GetTripByOrderIdUseCase(tripRepo);
 const updateTripStatusUseCase = new UpdateTripStatusUseCase(tripRepo);
+const completeTripUseCase = new CompleteTripUseCase(tripRepo);
 const getTripByIdUseCase = new GetTripByIdUseCase(tripRepo);
 const getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo);
 
@@ -229,25 +232,56 @@ export class TripController {
 
   async updateTripStatus(req: Request, res: Response) {
     try {
-      const { tripId, status } = req.body;
+      const tripId = req.params.id || req.body.tripId;
+      const { status } = req.body;
 
       if (!tripId || !status) {
-        return res.status(403).json({
+        return res.status(400).json({
           success: false,
           message: "tripId y status son requeridos",
         });
       }
 
-      await updateTripStatusUseCase.execute(tripId, status);
+      if (status === "completed") {
+        await completeTripUseCase.execute(tripId);
+      } else {
+        await updateTripStatusUseCase.execute(tripId, status);
+      }
 
       res.status(200).json({
         success: true,
-        message: `Status actualizao correctamente a ${status}`,
+        message: `Status actualizado correctamente a ${status}`,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         message: error.message || "Error al actualizar el status",
+      });
+    }
+  }
+
+  async createWithOrders(req: Request, res: Response) {
+    try {
+      const { tripNumber, orderIds, driverId, totalTons, comments, deliveries } = req.body;
+
+      const tripId = await createTripWithOrdersUseCase.execute({
+        tripNumber,
+        orderIds,
+        driverId,
+        totalTons,
+        comments,
+        deliveries,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Viaje con órdenes creado correctamente",
+        tripId,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Error al crear el viaje con órdenes",
       });
     }
   }

@@ -57,13 +57,36 @@ export class FirebaseAuthService implements AuthService {
     password: string,
     displayName: string
   ) {
-    const userRecord = await auth.createUser({
-      email: email.toLowerCase(),
-      password,
-      displayName,
-    });
+    try {
+      const response = await axios.post<any>(
+        `${getGoogleApiUrl()}/accounts:signUp?key=${getFirebaseApiKey()}`,
+        {
+          email: email.toLowerCase(),
+          password,
+          displayName,
+          returnSecureToken: true,
+        }
+      );
 
-    return { uid: userRecord.uid, email: userRecord.email! };
+      return {
+        uid: response.data.localId,
+        email: response.data.email,
+        idToken: response.data.idToken,
+        refreshToken: response.data.refreshToken,
+        expiresIn: response.data.expiresIn,
+      };
+    } catch (error: any) {
+      console.warn("REST signup error:", error?.response?.data || error?.message);
+      let errorMsg =
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        "Error al registrar usuario en Auth";
+
+      if (errorMsg.includes("EMAIL_EXISTS")) {
+        errorMsg = "The email address is already in use by another account.";
+      }
+      throw new Error(errorMsg);
+    }
   }
 
   async sendVerificationEmail(idToken: string) {
@@ -112,5 +135,13 @@ export class FirebaseAuthService implements AuthService {
         },
       }
     );
+  }
+
+  async deleteUser(uid: string): Promise<void> {
+    try {
+      await auth.deleteUser(uid);
+    } catch (error: any) {
+      console.warn("Advertencia al eliminar usuario de Auth:", error?.message);
+    }
   }
 }

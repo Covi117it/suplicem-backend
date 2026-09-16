@@ -55,8 +55,8 @@ export class GetMyOrdersUseCase {
 
     return orders.map((order) => ({
       ...order,
-      userNames: user?.names,
-      userLastNames: user?.lastNames,
+      userNames: user?.names || (order as any).userNames || "",
+      userLastNames: user?.lastNames || (order as any).userLastNames || "",
     }));
   }
 }
