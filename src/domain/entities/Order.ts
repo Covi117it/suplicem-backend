@@ -27,6 +27,9 @@ export interface Order {
   deliveryType: "almacen" | "domicilio";
   deliveries: DeliveryDetail[];
   items: OrderItem[];
+  paymentMethod?: "transfer" | "credit"; 
+  bankAccountId?: string; 
+  creditNote?: string;
   comments?: string;
   receiptImage?: string;
   status: "pending" | "approved" | "rejected";

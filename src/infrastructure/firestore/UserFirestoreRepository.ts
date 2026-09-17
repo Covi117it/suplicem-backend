@@ -1,6 +1,6 @@
 import { firestore } from "../../config/firebase";
 import { User } from "../../domain/entities/User";
-import { UserRepository } from "../../domain/repositories/UserRepository";
+import { UserRepository, UserFilters } from "../../domain/repositories/UserRepository";
 
 export class UserFirestoreRepository implements UserRepository {
   async create(user: User): Promise<void> {
@@ -32,9 +32,21 @@ export class UserFirestoreRepository implements UserRepository {
     }
   }
 
-  async getAll(): Promise<User[]> {
+  async getAll(filters?: UserFilters): Promise<User[]> {
     try {
-      const snapshot = await firestore.collection("users").get();
+      let query: FirebaseFirestore.Query = firestore.collection("users");
+
+      if (filters?.status) {
+        query = query.where("status", "==", filters.status);
+      }
+      if (filters?.userType) {
+        query = query.where("userType", "==", filters.userType);
+      }
+      if (filters?.aiRiskFlag !== undefined) {
+        query = query.where("aiRiskFlag", "==", filters.aiRiskFlag);
+      }
+
+      const snapshot = await query.get();
       return snapshot.docs.map((doc) => ({
         uid: doc.id,
         ...doc.data(),

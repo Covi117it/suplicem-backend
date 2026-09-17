@@ -15,9 +15,11 @@ export interface CreateOrderDto {
     quantity: number;
     name?: string;
     unit?: string;
-    unitPrice?: number;
     subtotal?: number;
   }[];
+  paymentMethod?: "transfer" | "credit";  
+  bankAccountId?: string;                 
+  creditNote?: string;                    
   comments?: string;
   receiptImage?: string;
 }

@@ -30,6 +30,9 @@ export const CreateOrderSchema = z
       .min(1, "Debe incluir al menos un producto"),
     comments: z.string().optional(),
     receiptImage: z.string().optional(),
+    paymentMethod: z.enum(["transfer", "credit"]).optional(),
+    bankAccountId: z.string().optional(),
+    creditNote: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (

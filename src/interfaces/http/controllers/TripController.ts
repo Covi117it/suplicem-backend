@@ -11,11 +11,13 @@ import { GetTripByIdUseCase } from "../../../application/use-cases/trip/GetTripB
 import { GetDriverActualTripsUseCase } from "../../../application/use-cases/trip/GetDriverActualTripsUseCase";
 import { GetTripByOrderIdUseCase } from "../../../application/use-cases/trip/GetTripByOrderIdUseCase";
 import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/GetDriverActiveTripUseCase";
+import { OrderFirestoreRepository } from "../../../infrastructure/firestore/OrderFirestoreRepository";
 import { CompleteTripUseCase } from "../../../application/use-cases/trip/CompleteTripUseCase";
 import { CreateTripWithOrdersUseCase } from "../../../application/use-cases/trip/CreateTripWithOrdersUseCase";
 
 const tripRepo = new TripFirestoreRepository();
-const createTripUseCase = new CreateTripUseCase(tripRepo);
+const orderRepo = new OrderFirestoreRepository();                    
+const createTripUseCase = new CreateTripUseCase(tripRepo, orderRepo); 
 const createTripWithOrdersUseCase = new CreateTripWithOrdersUseCase(tripRepo);
 const getAvailableTripsUseCase = new GetAvailableTripsUseCase(tripRepo);
 const getDriverTripHistoryUseCase = new GetDriverTripHistoryUseCase(tripRepo);

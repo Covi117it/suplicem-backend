@@ -24,7 +24,7 @@ const productRepo = new ProductFirestoreRepository();
 const createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo);
 const getMyOrdersUseCase = new GetMyOrdersUseCase(orderRepo, userRepo);
 const getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo);
-const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo);
+const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo); 
 const getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo);
 const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo);
 const markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(
@@ -37,16 +37,23 @@ const updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(
 export class OrderController {
   async create(req: Request, res: Response) {
     try {
-      const { deliveryType, deliveries, items, comments, receiptImage } = req.body;
-      const userId = req.user?.uid;
-
+      const {
+        deliveryType,
+        deliveries,
+        items,
+        comments,
+        receiptImage,
+        paymentMethod,
+        bankAccountId,
+        creditNote,
+      } = req.body;
+      const userId = (req as any).user?.uid;
       if (!userId || !deliveryType || !items || items.length === 0) {
         return res.status(400).json({
           success: false,
           message: "Faltan datos requeridos",
         });
       }
-
       const { orderId, orderNumber } = await createOrderUseCase.execute({
         userId,
         deliveryType,
@@ -54,6 +61,9 @@ export class OrderController {
         items,
         comments,
         receiptImage,
+        paymentMethod,
+        bankAccountId,
+        creditNote,
       });
 
       // try {
@@ -82,13 +92,24 @@ export class OrderController {
   async getTracking(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const tracking = await getOrderTrackingUseCase.execute(id);
-      if (!tracking) {
+      const order = await orderRepo.getById(id);
+      if (!order) {
         return res.status(404).json({
           success: false,
           message: "Orden no encontrada",
         });
       }
+
+      // OWASP API1 (BOLA): Clients can only track their own orders
+      const authUser = (req as any).user;
+      if (authUser && authUser.userType === "client" && order.userId !== authUser.uid) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para ver el tracking de esta orden",
+        });
+      }
+
+      const tracking = await getOrderTrackingUseCase.execute(id);
       res.status(200).json({
         success: true,
         tracking,
@@ -104,7 +125,7 @@ export class OrderController {
 
    async getMyOrders(req: Request, res: Response) {
     try {
-      const userId = req.user?.uid;
+      const userId = (req as any).user?.uid;
       const { search, status } = req.query;
 
       if (!userId) {
@@ -142,6 +163,15 @@ export class OrderController {
           .json({ success: false, message: "Orden no encontrada" });
       }
 
+      // OWASP API1 (BOLA): Clients can only view their own orders
+      const authUser = (req as any).user;
+      if (authUser && authUser.userType === "client" && order.userId !== authUser.uid) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para ver esta orden",
+        });
+      }
+
       res.status(200).json({ success: true, order });
     } catch (error: any) {
       res.status(500).json({
@@ -151,16 +181,24 @@ export class OrderController {
     }
   }
 
-  async getAll(req: Request, res: Response) {
+   async getAll(req: Request, res: Response) {
     try {
-      const { status } = req.query;
-
-      const orders = await getAllOrdersUseCase.execute(`${status}`);
-
-      res.status(200).json({
-        success: true,
-        orders,
-      });
+      const { status, deliveryType, userId, withoutTrip } = req.query;
+      const filters: any = {};
+      if (typeof status === "string" && status !== "undefined" && status.trim()) {
+        filters.status = status.trim();
+      }
+      if (typeof deliveryType === "string" && deliveryType.trim()) {
+        filters.deliveryType = deliveryType.trim();
+      }
+      if (typeof userId === "string" && userId.trim()) {
+        filters.userId = userId.trim();
+      }
+      if (withoutTrip !== undefined) {
+        filters.withoutTrip = String(withoutTrip).toLowerCase() === "true";
+      }
+      const orders = await getAllOrdersUseCase.execute(filters);
+      res.status(200).json({ success: true, orders });
     } catch (error: any) {
       res.status(500).json({
         success: false,

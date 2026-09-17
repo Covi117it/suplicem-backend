@@ -1,6 +1,6 @@
 import { firestore } from "../../config/firebase";
 import { Order } from "../../domain/entities/Order";
-import { OrderRepository } from "../../domain/repositories/OrderRepository";
+import { OrderRepository, OrderFilters } from "../../domain/repositories/OrderRepository";
 
 export class OrderFirestoreRepository implements OrderRepository {
   async create(
@@ -32,15 +32,26 @@ export class OrderFirestoreRepository implements OrderRepository {
     return { id: doc.id, ...doc.data() } as Order;
   }
 
-  async getAll(status?: string): Promise<Order[]> {
+  async getAll(filters?: OrderFilters | string): Promise<Order[]> {
     let query: FirebaseFirestore.Query = firestore.collection("orders");
 
-    if (status && status !== "undefined") {
-      query = query.where("status", "==", status);
+    const parsedFilters: OrderFilters =
+      typeof filters === "string"
+        ? (filters && filters !== "undefined" ? { status: filters } : {})
+        : filters || {};
+
+    if (parsedFilters.status && parsedFilters.status !== "undefined") {
+      query = query.where("status", "==", parsedFilters.status);
+    }
+    if (parsedFilters.deliveryType) {
+      query = query.where("deliveryType", "==", parsedFilters.deliveryType);
+    }
+    if (parsedFilters.userId) {
+      query = query.where("userId", "==", parsedFilters.userId);
     }
 
     const snapshot = await query.get();
-    const ordersWithTrip = await Promise.all(
+    let ordersWithTrip = await Promise.all(
       snapshot.docs.map(async (doc) => {
         const orderData = {
           id: doc.id,
@@ -69,6 +80,10 @@ export class OrderFirestoreRepository implements OrderRepository {
         return orderData;
       })
     );
+
+    if (parsedFilters.withoutTrip) {
+      ordersWithTrip = ordersWithTrip.filter((o) => !o.tripId);
+    }
 
     return ordersWithTrip;
   }

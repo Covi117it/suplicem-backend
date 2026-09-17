@@ -81,6 +81,11 @@ export class TripFirestoreRepository implements TripRepository {
   async updateTripStatus(tripId: string, status: string): Promise<void> {
     if (status === "completed") {
       await this.completeTrip(tripId);
+    } else if (status === "available") {
+      await firestore.collection("trips").doc(tripId).update({
+        status: "available",
+        assignedDriverId: "",
+      });
     } else {
       await firestore.collection("trips").doc(tripId).update({
         status: status,

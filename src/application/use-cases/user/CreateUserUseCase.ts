@@ -1,4 +1,5 @@
 import { User } from "../../../domain/entities/User";
+import { isValidDominicanCedula, isValidPassport } from "../../../domain/services/IdentityVerificationService";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { AuthService } from "../../../domain/services/AuthService";
 import { RegistrationBotService } from "../../../infrastructure/services/RegistrationBotService";
@@ -49,6 +50,16 @@ export class CreateUserUseCase {
 
     if (!email || !password) {
       throw new Error("El correo electrónico y la contraseña son requeridos.");
+    }
+
+    if (identificationType === "Cedula") {
+      if (!isValidDominicanCedula(identification)) {
+        throw new Error("El número de cédula dominicana ingresado no es válido.");
+      }
+    } else if (identificationType === "Pasaporte") {
+      if (!isValidPassport(identification)) {
+        throw new Error("El formato del pasaporte no es válido (debe tener entre 6 y 12 caracteres alfanuméricos).");
+      }
     }
 
     // 1. Crear usuario en Firebase Auth primero
