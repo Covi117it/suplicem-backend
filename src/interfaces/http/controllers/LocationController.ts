@@ -26,7 +26,7 @@ export class LocationController {
     const data = await getLocation.execute(driverId);
 
     if (!data) {
-      return res.status(404).json({ success: false, message: "Ubicación no encontrada" });
+      return res.status(200).json({ success: true, location: null, message: "Ubicación no disponible" });
     }
 
     res.status(200).json({ success: true, location: data });

@@ -12,7 +12,10 @@ export const requireRole = (allowedRoles: Array<"client" | "driver" | "admin">) 
       return;
     }
 
-    if (!allowedRoles.includes(user.userType)) {
+    const userRole = String(user.userType || "").trim().toLowerCase();
+    const normalizedAllowed = allowedRoles.map((r) => r.toLowerCase());
+
+    if (!normalizedAllowed.includes(userRole)) {
       res.status(403).json({
         success: false,
         message: `Acceso denegado: se requiere uno de los siguientes roles [${allowedRoles.join(", ")}]`,

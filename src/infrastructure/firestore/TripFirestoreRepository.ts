@@ -9,16 +9,28 @@ export class TripFirestoreRepository implements TripRepository {
     return docRef.id;
   }
 
-  async getAvailable(): Promise<Trip[]> {
+  async getAvailable(driverId?: string): Promise<Trip[]> {
     const snapshot = await firestore
       .collection("trips")
       .where("status", "==", "available")
       .get();
 
-    return snapshot.docs.map((doc) => ({
+    let trips = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as Trip[];
+
+    if (driverId) {
+      trips = trips.filter(
+        (t: any) =>
+          !t.assignedDriverId ||
+          t.assignedDriverId === "" ||
+          t.assignedDriverId === driverId ||
+          (t.driverId && t.driverId === driverId)
+      );
+    }
+
+    return trips;
   }
 
   async getAll(): Promise<Trip[]> {
@@ -35,7 +47,16 @@ export class TripFirestoreRepository implements TripRepository {
       .where("assignedDriverId", "==", userId)
       .get();
 
-    return snapshot.docs
+    let docs = snapshot.docs;
+    if (docs.length === 0) {
+      const snap2 = await firestore
+        .collection("trips")
+        .where("driverId", "==", userId)
+        .get();
+      docs = snap2.docs;
+    }
+
+    return docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter((trip: any) => trip.status !== "available") as Trip[];
   }
@@ -46,11 +67,31 @@ export class TripFirestoreRepository implements TripRepository {
       .where("assignedDriverId", "==", userId)
       .get();
 
-    return snapshot.docs
+    let trips = snapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter(
-        (trip: any) => trip.status === "accepted" || trip.status === "started"
+        (trip: any) =>
+          trip.status === "accepted" ||
+          trip.status === "started" ||
+          trip.status === "in_progress"
       ) as Trip[];
+
+    if (trips.length === 0) {
+      const driverSnapshot = await firestore
+        .collection("trips")
+        .where("driverId", "==", userId)
+        .get();
+      trips = driverSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter(
+          (trip: any) =>
+            trip.status === "accepted" ||
+            trip.status === "started" ||
+            trip.status === "in_progress"
+        ) as Trip[];
+    }
+
+    return trips;
   }
 
   async assignDriver(tripId: string, driverId: string): Promise<void> {
@@ -65,26 +106,86 @@ export class TripFirestoreRepository implements TripRepository {
 
       const tripData = tripDoc.data();
       if (tripData?.status !== "available") {
+        if (
+          tripData?.status === "accepted" &&
+          (tripData?.assignedDriverId === driverId || tripData?.driverId === driverId)
+        ) {
+          // Idempotencia: el viaje ya fue aceptado por este conductor
+          return;
+        }
         throw new Error(
           `El viaje ${tripData?.tripNumber || tripId} ya fue tomado por otro conductor.`
         );
       }
 
+      if (
+        tripData?.assignedDriverId &&
+        tripData.assignedDriverId !== "" &&
+        tripData.assignedDriverId !== driverId
+      ) {
+        throw new Error("Este viaje fue asignado específicamente a otro conductor");
+      }
+
       transaction.update(tripRef, {
         status: "accepted",
         assignedDriverId: driverId,
+        driverId: driverId,
         acceptedAt: new Date().toISOString(),
       });
+
+      // Actualizar todas las órdenes vinculadas a este viaje para reflejar al conductor
+      const orderIds = tripData?.orderIds || [];
+      for (const oId of orderIds) {
+        const orderRef = firestore.collection("orders").doc(oId);
+        transaction.update(orderRef, {
+          assignedDriverId: driverId,
+          driverId: driverId,
+          tripId: tripId,
+          tripStatus: "accepted",
+        });
+      }
     });
   }
 
   async updateTripStatus(tripId: string, status: string): Promise<void> {
     if (status === "completed") {
       await this.completeTrip(tripId);
+    } else if (status === "available" || status === "canceled") {
+      const tripDoc = await firestore.collection("trips").doc(tripId).get();
+      const tripData = tripDoc.data();
+
+      await firestore.collection("trips").doc(tripId).update({
+        status: status,
+        assignedDriverId: "",
+        driverId: "",
+      });
+
+      const orderIds = tripData?.orderIds || [];
+      for (const oId of orderIds) {
+        await firestore.collection("orders").doc(oId).update({
+          tripStatus: "available",
+          assignedDriverId: "",
+          driverId: "",
+        });
+      }
     } else {
       await firestore.collection("trips").doc(tripId).update({
         status: status,
       });
+
+      // Si el conductor inicia el viaje ("started"), reflejar "on_the_way" en las órdenes del cliente
+      if (status === "started" || status === "in_progress") {
+        const tripDoc = await firestore.collection("trips").doc(tripId).get();
+        const tripData = tripDoc.data();
+        const orderIds = tripData?.orderIds || [];
+
+        for (const oId of orderIds) {
+          await firestore.collection("orders").doc(oId).update({
+            status: "on_the_way",
+            tripStatus: "started",
+          });
+        }
+      }
     }
   }
 
@@ -345,7 +446,7 @@ export class TripFirestoreRepository implements TripRepository {
         assignedDriverId: data.driverId || "",
         totalTons: data.totalTons,
         comments: data.comments || "",
-        status: data.driverId ? "accepted" : "available",
+        status: "available",
         createdAt: new Date().toISOString(),
       };
 

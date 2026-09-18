@@ -4,7 +4,7 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 export class GetAvailableTripsUseCase {
   constructor(private tripRepo: TripRepository) {}
 
-  async execute(): Promise<Trip[]> {
-    return await this.tripRepo.getAvailable();
+  async execute(driverId?: string): Promise<Trip[]> {
+    return await this.tripRepo.getAvailable(driverId);
   }
 }

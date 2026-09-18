@@ -4,6 +4,7 @@ import { Address } from "../../domain/entities/User";
 export interface CreateOrderDto {
   userId: string;
   deliveryType: "almacen" | "domicilio";
+  deliveryAddress?: Address;
   deliveries?: {
     productId: string;
     address?: Address;
@@ -15,9 +16,11 @@ export interface CreateOrderDto {
     quantity: number;
     name?: string;
     unit?: string;
-    unitPrice?: number;
     subtotal?: number;
   }[];
+  paymentMethod?: "transfer" | "credit";  
+  bankAccountId?: string;                 
+  creditNote?: string;                    
   comments?: string;
   receiptImage?: string;
 }

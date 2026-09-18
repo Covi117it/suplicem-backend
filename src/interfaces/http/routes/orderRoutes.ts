@@ -3,7 +3,12 @@ import { OrderController } from "../controllers/OrderController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
 import { validate } from "../middlewares/validate";
-import { CreateOrderSchema, UpdateOrderStatusSchema } from "../schemas/orderSchemas";
+import {
+  CreateOrderSchema,
+  UpdateOrderStatusSchema,
+  UpdateOrderDeliveriesSchema,
+  CompleteDeliverySchema,
+} from "../schemas/orderSchemas";
 import multer from "multer";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -58,25 +63,38 @@ export const orderRoutes = (router: Router) => {
   );
 
   // 6. Asignar/actualizar entregas (Administradores)
-  router.put("/orders/:id/deliveries", authenticate, async (req, res) => {
-    await orderController.updateDeliveries(req, res);
-  });
+  router.put(
+    "/orders/:id/deliveries",
+    authenticate,
+    requireRole(["admin"]),
+    validate(UpdateOrderDeliveriesSchema),
+    async (req, res) => {
+      await orderController.updateDeliveries(req, res);
+    }
+  );
 
-  router.patch("/orders/:id/deliveries", authenticate, async (req, res) => {
-    await orderController.updateDeliveries(req, res);
-  });
+  router.patch(
+    "/orders/:id/deliveries",
+    authenticate,
+    requireRole(["admin"]),
+    validate(UpdateOrderDeliveriesSchema),
+    async (req, res) => {
+      await orderController.updateDeliveries(req, res);
+    }
+  );
 
   // 7. Marcar entrega completada (Conductores y Administradores)
   router.patch(
     "/orders/:id/deliveries/:index",
     authenticate,
     requireRole(["driver", "admin"]),
+    validate(CompleteDeliverySchema),
     async (req, res) => {
       await orderController.completeDelivery(req, res);
     }
   );
 
-  // 7. Adjuntar comprobante fotográfico a entrega (Conductores y Administradores)
+  // 8. Adjuntar comprobante fotográfico a entrega (Conductores y Administradores)
   router.patch(
     "/orders/:id/deliveries/:index/attachment",
     authenticate,
@@ -87,12 +105,13 @@ export const orderRoutes = (router: Router) => {
     }
   );
 
-  // 8. Completar entrega con comprobante en una sola operación atómica (Conductores y Administradores)
+  // 9. Completar entrega con comprobante en una sola operación atómica (Conductores y Administradores)
   router.post(
     "/orders/:id/deliveries/:index/complete",
     authenticate,
     requireRole(["driver", "admin"]),
     upload.single("image"),
+    validate(CompleteDeliverySchema),
     async (req, res) => {
       await orderController.completeDeliveryWithProof(req, res);
     }

@@ -1,5 +1,5 @@
 import { UserRepository } from "../../../domain/repositories/UserRepository";
-import { OrderRepository } from "../../../domain/repositories/OrderRepository";
+import { OrderRepository, OrderFilters } from "../../../domain/repositories/OrderRepository";
 import { EnrichedOrder } from "../../../domain/entities/EnrichedOrder";
 
 export class GetAllOrdersUseCase {
@@ -8,8 +8,8 @@ export class GetAllOrdersUseCase {
     private userRepo: UserRepository
   ) {}
 
-  async execute(status?: string): Promise<EnrichedOrder[]> {
-    const orders = await this.orderRepo.getAll(status);
+  async execute(filters?: OrderFilters | string): Promise<EnrichedOrder[]> {
+    const orders = await this.orderRepo.getAll(filters);
 
     const enrichedOrders: EnrichedOrder[] = await Promise.all(
       orders.map(async (order) => {

@@ -1,6 +1,7 @@
 import { firestore } from "../../config/firebase";
 import { Order } from "../../domain/entities/Order";
-import { OrderRepository } from "../../domain/repositories/OrderRepository";
+import { OrderRepository, OrderFilters } from "../../domain/repositories/OrderRepository";
+import { FieldPath } from "firebase-admin/firestore";
 
 export class OrderFirestoreRepository implements OrderRepository {
   async create(
@@ -17,41 +18,133 @@ export class OrderFirestoreRepository implements OrderRepository {
     const snapshot = await firestore
       .collection("orders")
       .where("userId", "==", userId)
-      //.orderBy("createdAt", "desc")
       .get();
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Order[];
+    let userDocData: any = null;
+    try {
+      const uDoc = await firestore.collection("users").doc(userId).get();
+      if (uDoc.exists) userDocData = uDoc.data();
+    } catch (e) {
+      console.warn("Error obteniendo usuario para getByUser:", e);
+    }
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      const fallbackDeliveryAddress =
+        data.deliveryAddress ||
+        (data.deliveries && data.deliveries.length > 0
+          ? data.deliveries[0].address
+          : undefined);
+      return {
+        id: doc.id,
+        ...data,
+        deliveryAddress: fallbackDeliveryAddress,
+        userPhone: data.userPhone || userDocData?.phone || "",
+        userNames: data.userNames || userDocData?.names || "",
+        userLastNames: data.userLastNames || userDocData?.lastNames || "",
+        userEmail: data.userEmail || userDocData?.email || "",
+      } as Order;
+    });
   }
 
   async getById(orderId: string): Promise<Order | null> {
     const doc = await firestore.collection("orders").doc(orderId).get();
     if (!doc.exists) return null;
-    return { id: doc.id, ...doc.data() } as Order;
+    const orderData = { id: doc.id, ...doc.data() } as Order;
+
+    if (!orderData.deliveryAddress && orderData.deliveries && orderData.deliveries.length > 0) {
+      orderData.deliveryAddress = orderData.deliveries[0].address;
+    }
+
+    if (orderData.userId) {
+      try {
+        const userDoc = await firestore
+          .collection("users")
+          .doc(orderData.userId)
+          .get();
+        if (userDoc.exists) {
+          const u = userDoc.data();
+          orderData.userPhone = u?.phone || orderData.userPhone || "";
+          orderData.userNames = u?.names || orderData.userNames || "";
+          orderData.userLastNames = u?.lastNames || orderData.userLastNames || "";
+          orderData.userEmail = u?.email || orderData.userEmail || "";
+          orderData.clientAddresses = u?.addresses || [];
+        }
+      } catch (e) {
+        console.warn(`Error al enriquecer orden ${orderId} con datos del usuario:`, e);
+      }
+    }
+
+    return orderData;
   }
 
-  async getAll(status?: string): Promise<Order[]> {
+  async getAll(filters?: OrderFilters | string): Promise<Order[]> {
     let query: FirebaseFirestore.Query = firestore.collection("orders");
 
-    if (status && status !== "undefined") {
-      query = query.where("status", "==", status);
+    const parsedFilters: OrderFilters =
+      typeof filters === "string"
+        ? (filters && filters !== "undefined" ? { status: filters } : {})
+        : filters || {};
+
+    if (parsedFilters.status && parsedFilters.status !== "undefined") {
+      query = query.where("status", "==", parsedFilters.status);
+    }
+    if (parsedFilters.deliveryType) {
+      query = query.where("deliveryType", "==", parsedFilters.deliveryType);
+    }
+    if (parsedFilters.userId) {
+      query = query.where("userId", "==", parsedFilters.userId);
     }
 
     const snapshot = await query.get();
-    const ordersWithTrip = await Promise.all(
-      snapshot.docs.map(async (doc) => {
-        const orderData = {
-          id: doc.id,
-          ...doc.data(),
-        } as Order;
+
+    const rawOrders: Order[] = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Order[];
+
+    const userIdsToFetch = [
+      ...new Set(
+        rawOrders
+          .filter((o) => o.userId && (!o.userPhone || !o.userNames))
+          .map((o) => o.userId)
+      ),
+    ];
+
+    const userMap = new Map<string, any>();
+    if (userIdsToFetch.length > 0) {
+      for (let i = 0; i < userIdsToFetch.length; i += 10) {
+        const chunk = userIdsToFetch.slice(i, i + 10);
+        try {
+          const uSnap = await firestore
+            .collection("users")
+            .where(FieldPath.documentId(), "in", chunk)
+            .get();
+          uSnap.docs.forEach((uDoc) => userMap.set(uDoc.id, uDoc.data()));
+        } catch (e) {
+          console.warn("Error fetching users for orders enrichment:", e);
+        }
+      }
+    }
+
+    let ordersWithTrip = await Promise.all(
+      rawOrders.map(async (orderData) => {
+        if (orderData.userId && userMap.has(orderData.userId)) {
+          const u = userMap.get(orderData.userId);
+          orderData.userPhone = u?.phone || orderData.userPhone || "";
+          orderData.userNames = u?.names || orderData.userNames || "";
+          orderData.userLastNames = u?.lastNames || orderData.userLastNames || "";
+          orderData.userEmail = u?.email || orderData.userEmail || "";
+        }
+
+        if (!orderData.deliveryAddress && orderData.deliveries && orderData.deliveries.length > 0) {
+          orderData.deliveryAddress = orderData.deliveries[0].address;
+        }
 
         try {
-          // Verificamos si esta orden está en algún trip
           const tripSnap = await firestore
             .collection("trips")
-            .where("orderIds", "array-contains", doc.id)
+            .where("orderIds", "array-contains", orderData.id!)
             .limit(1)
             .get();
 
@@ -63,12 +156,16 @@ export class OrderFirestoreRepository implements OrderRepository {
             };
           }
         } catch (tripError) {
-          console.warn(`Error al consultar trip para la orden ${doc.id}:`, tripError);
+          console.warn(`Error al consultar trip para la orden ${orderData.id}:`, tripError);
         }
 
         return orderData;
       })
     );
+
+    if (parsedFilters.withoutTrip) {
+      ordersWithTrip = ordersWithTrip.filter((o) => !o.tripId);
+    }
 
     return ordersWithTrip;
   }
@@ -147,6 +244,33 @@ export class OrderFirestoreRepository implements OrderRepository {
 
     data.deliveries[index].delivered = true;
     data.deliveries[index].status = "delivered";
+    if (options.comment) {
+      data.deliveries[index].comment = options.comment;
+    }
+    if (options.imageUrl) {
+      data.deliveries[index].imageUrl = options.imageUrl;
+    }
+
+    await ref.update({ deliveries: data.deliveries });
+  }
+
+  async attachDeliveryProof(
+    orderId: string,
+    index: number,
+    options: { comment?: string; imageUrl?: string }
+  ): Promise<void> {
+    const ref = firestore.collection("orders").doc(orderId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      throw new Error("Orden no encontrada");
+    }
+
+    const data = snap.data();
+    if (!data?.deliveries || !data.deliveries[index]) {
+      throw new Error("Entrega no encontrada");
+    }
+
     if (options.comment) {
       data.deliveries[index].comment = options.comment;
     }

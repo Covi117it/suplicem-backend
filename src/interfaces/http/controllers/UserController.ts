@@ -3,6 +3,7 @@ import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserF
 import { FirebaseAuthService } from "../../../infrastructure/services/FirebaseAuthService";
 import { CreateUserUseCase } from "../../../application/use-cases/user/CreateUserUseCase";
 import { GetAllUsersUseCase } from "../../../application/use-cases/user/GetAllUsersUseCase";
+import { GetUserByIdUseCase } from "../../../application/use-cases/user/GetUserByIdUseCase";
 import { UpdateUserStatusUseCase } from "../../../application/use-cases/user/UpdateUserStatusUseCase";
 import { UpdateUserUseCase } from "../../../application/use-cases/user/UpdateUserUseCase";
 import { User } from "../../../domain/entities/User";
@@ -11,46 +12,22 @@ const userRepo = new UserFirestoreRepository();
 const authService = new FirebaseAuthService();
 const createUserUseCase = new CreateUserUseCase(userRepo, authService);
 const getAllUsersUseCase = new GetAllUsersUseCase(userRepo);
+const getUserByIdUseCase = new GetUserByIdUseCase(userRepo);
 const updateUserStatusUseCase = new UpdateUserStatusUseCase(userRepo);
 const updateUserUseCase = new UpdateUserUseCase(userRepo);
 
 export class UserController {
   async create(req: Request, res: Response) {
     try {
-      const file =
-        req.file ||
-        (Array.isArray((req as any).files) && (req as any).files.length > 0
-          ? (req as any).files[0]
-          : undefined);
-
-      let userData: any = req.body || {};
-
-      if (userData && userData.data) {
-        if (typeof userData.data === "string") {
-          try {
-            const parsed = JSON.parse(userData.data);
-            userData = { ...parsed, ...userData };
-          } catch (e) {
-            console.warn("No se pudo parsear req.body.data como JSON:", e);
-          }
-        } else if (typeof userData.data === "object") {
-          userData = { ...userData.data, ...userData };
-        }
-      } else if (typeof userData === "string") {
-        try {
-          userData = JSON.parse(userData);
-        } catch (e) {}
-      }
-
-      console.log("📥 Petición de registro recibida en /api/users");
-      console.log("🔑 Email recibido:", userData?.email || userData?.data?.email);
-
-      const result = await createUserUseCase.execute(userData, file);
-      res.status(201).json({
-        success: true,
-        message: "Usuario creado y verificación enviada",
-        ...(result || {}),
-      });
+      const file = req.file || (req.files && Array.isArray(req.files) ? (req.files as any)[0] : undefined);
+      const result = await createUserUseCase.execute(req.body, file);
+      res
+        .status(201)
+        .json({
+          success: true,
+          message: "Usuario creado y verificación enviada",
+          ...result,
+        });
     } catch (error: any) {
       console.error("Error en UserController.create:", error);
       let errorMsg = error.message || "Error al crear el usuario";
@@ -65,7 +42,26 @@ export class UserController {
 
   async updateUser(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
       const user: User = req.body;
+
+      if (!authUser) {
+        return res.status(401).json({ success: false, message: "Usuario no autenticado" });
+      }
+
+      // OWASP API1 (BOLA): Only admins or the user themselves can update their profile
+      if (authUser.userType !== "admin") {
+        if (authUser.uid !== user.uid) {
+          return res.status(403).json({
+            success: false,
+            message: "No tienes permiso para actualizar este usuario",
+          });
+        }
+        // OWASP API3 (Mass Assignment): Prevent privilege escalation
+        user.userType = authUser.userType;
+        user.status = authUser.status;
+      }
+
       await updateUserUseCase.execute(user);
       res.status(200).json({ message: "Usuario actualizado correctamente" });
     } catch (error: any) {
@@ -85,9 +81,44 @@ export class UserController {
     }
   }
 
+  async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await getUserByIdUseCase.execute(id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "Usuario no encontrado",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        user,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error al obtener el usuario",
+      });
+    }
+  }
+
   async getAll(req: Request, res: Response) {
     try {
-      const users = await getAllUsersUseCase.execute();
+      const { status, userType, aiRiskFlag } = req.query;
+      const filters: any = {};
+      if (typeof status === "string" && status !== "undefined" && status.trim()) {
+        filters.status = status.trim();
+      }
+      if (typeof userType === "string" && userType.trim()) {
+        filters.userType = userType.trim();
+      }
+      if (aiRiskFlag !== undefined) {
+        filters.aiRiskFlag = String(aiRiskFlag).toLowerCase() === "true";
+      }
+
+      const users = await getAllUsersUseCase.execute(filters);
       res.status(200).json({
         success: true,
         users,

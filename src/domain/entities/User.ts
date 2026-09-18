@@ -27,6 +27,7 @@ export interface User {
   };
   createdAt: string;
   status: string; // 'pending' | 'active' | 'inactive' | 'rejected'
+  driverCode?: string;
   aiRiskFlag?: boolean;
   aiRiskScore?: number;
   aiRiskReason?: string;
