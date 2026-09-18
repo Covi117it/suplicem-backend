@@ -36,17 +36,20 @@ export const authenticate = async (
       .doc(decodedToken.uid)
       .get();
     const userData = userDoc.data();
+    const rawUserType = userData?.userType || "client";
+    const normalizedUserType = String(rawUserType).trim().toLowerCase();
 
     (req as any).user = {
       ...decodedToken,
       uid: decodedToken.uid,
       email: decodedToken.email,
-      userType: userData?.userType || "client",
+      userType: normalizedUserType,
       status: userData?.status || "pending",
     } as AuthenticatedUser;
 
     next();
   } catch (error: any) {
+    console.error("Authentication middleware error:", error);
     res.status(401).json({
       success: false,
       message: "Token inválido o expirado",

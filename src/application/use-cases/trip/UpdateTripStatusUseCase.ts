@@ -15,6 +15,11 @@ export class UpdateTripStatusUseCase {
 
     const currentStatus = trip.status;
 
+    // Si ya se encuentra en el estado solicitado, responder exitosamente (idempotencia)
+    if (currentStatus === targetStatus) {
+      return;
+    }
+
     // 1. Estados terminales: no admiten cambios
     if (currentStatus === "completed") {
       throw new Error("El viaje ya se encuentra finalizado y no puede cambiar de estado.");
@@ -25,9 +30,10 @@ export class UpdateTripStatusUseCase {
 
     // 2. Matriz de transiciones permitidas
     const allowedTransitions: Record<string, string[]> = {
-      available: ["accepted", "canceled"],
-      accepted: ["started", "available", "canceled"],
-      started: ["completed", "canceled"],
+      available: ["accepted", "canceled", "started"],
+      accepted: ["started", "in_progress", "available", "canceled"],
+      started: ["completed", "canceled", "available", "in_progress"],
+      in_progress: ["completed", "canceled", "available", "started"],
     };
 
     const allowed = allowedTransitions[currentStatus] || [];
@@ -38,7 +44,13 @@ export class UpdateTripStatusUseCase {
     }
 
     // 3. Regla específica para iniciar ruta: debe tener chofer asignado
-    if (targetStatus === "started" && !trip.assignedDriverId) {
+    const assignedDriver =
+      trip.assignedDriverId ||
+      (trip as any).driverId ||
+      trip.driver?.id ||
+      trip.driver?.uid;
+
+    if ((targetStatus === "started" || targetStatus === "in_progress") && !assignedDriver) {
       throw new Error("No se puede iniciar el viaje porque no tiene un conductor asignado.");
     }
 

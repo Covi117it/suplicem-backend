@@ -25,6 +25,7 @@ export interface Order {
   id?: string;
   userId: string;
   deliveryType: "almacen" | "domicilio";
+  deliveryAddress?: Address;
   deliveries: DeliveryDetail[];
   items: OrderItem[];
   paymentMethod?: "transfer" | "credit"; 
@@ -36,6 +37,11 @@ export interface Order {
   rejectionReason?: string;
   createdAt: string;
   tripId?: string;
+  userPhone?: string;
+  userNames?: string;
+  userLastNames?: string;
+  userEmail?: string;
+  clientAddresses?: Address[];
   aiRiskFlag?: boolean;
   aiRiskScore?: number;
   aiRiskReason?: string;

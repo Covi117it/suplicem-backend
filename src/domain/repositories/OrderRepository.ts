@@ -23,6 +23,11 @@ export interface OrderRepository {
     index: number,
     data: { comment?: string; imageUrl?: string }
   ): Promise<void>;
+  attachDeliveryProof(
+    orderId: string,
+    index: number,
+    data: { comment?: string; imageUrl?: string }
+  ): Promise<void>;
   updateDeliveries(
     orderId: string,
     deliveryType: string,

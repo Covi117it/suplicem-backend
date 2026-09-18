@@ -25,7 +25,12 @@ export class UserFirestoreRepository implements UserRepository {
         return null;
       }
       const doc = await firestore.collection("users").doc(uid).get();
-      return doc.exists ? (doc.data() as User) : null;
+      if (!doc.exists) return null;
+      const data = doc.data() as User;
+      if (data.userType === "driver" && !data.driverCode) {
+        data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
+      }
+      return { ...data, uid: doc.id };
     } catch (error: any) {
       console.warn("Advertencia en Firestore getById:", error.message);
       return null;
@@ -47,10 +52,16 @@ export class UserFirestoreRepository implements UserRepository {
       }
 
       const snapshot = await query.get();
-      return snapshot.docs.map((doc) => ({
-        uid: doc.id,
-        ...doc.data(),
-      })) as User[];
+      return snapshot.docs.map((doc) => {
+        const data = doc.data() as User;
+        if (data.userType === "driver" && !data.driverCode) {
+          data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
+        }
+        return {
+          ...data,
+          uid: doc.id,
+        };
+      });
     } catch (error: any) {
       console.warn("Advertencia al obtener usuarios en Firestore:", error?.message || error);
       return [];

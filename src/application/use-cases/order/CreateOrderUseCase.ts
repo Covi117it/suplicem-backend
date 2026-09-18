@@ -3,6 +3,7 @@ import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { ProductRepository } from "../../../domain/repositories/ProductRepository";
 import { SynthIDDetectorService } from "../../../infrastructure/services/SynthIDDetectorService";
 import { CreateOrderDto } from "../../dtos/OrderDtos";
+import { firestore } from "../../../config/firebase";
 
 export class CreateOrderUseCase {
   private synthIDDetector = new SynthIDDetectorService();
@@ -58,15 +59,45 @@ export class CreateOrderUseCase {
         quantity: item.quantity,
         unitPrice,
         subtotal,
-  });
-}
+      });
+    }
+
+    let userPhone = "";
+    let userNames = "";
+    let userLastNames = "";
+    let userEmail = "";
+
+    try {
+      const userDoc = await firestore.collection("users").doc(data.userId).get();
+      if (userDoc.exists) {
+        const u = userDoc.data();
+        userPhone = u?.phone || "";
+        userNames = u?.names || "";
+        userLastNames = u?.lastNames || "";
+        userEmail = u?.email || "";
+      }
+    } catch (e) {
+      console.warn("No se pudo obtener datos del usuario al crear orden:", e);
+    }
+
+    const resolvedDeliveryAddress =
+      data.deliveryAddress ||
+      (data.deliveries && data.deliveries.length > 0 && data.deliveries[0].address
+        ? data.deliveries[0].address
+        : undefined);
 
     const order: Order = {
       orderNumber,
       userId: data.userId,
+      userPhone,
+      userNames,
+      userLastNames,
+      userEmail,
       deliveryType: data.deliveryType,
+      deliveryAddress: resolvedDeliveryAddress,
       deliveries: (data.deliveries ?? []).map((d) => ({
         ...d,
+        address: d.address || resolvedDeliveryAddress,
         status: "pending",
         images: [],
       })),

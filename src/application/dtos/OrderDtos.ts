@@ -4,6 +4,7 @@ import { Address } from "../../domain/entities/User";
 export interface CreateOrderDto {
   userId: string;
   deliveryType: "almacen" | "domicilio";
+  deliveryAddress?: Address;
   deliveries?: {
     productId: string;
     address?: Address;

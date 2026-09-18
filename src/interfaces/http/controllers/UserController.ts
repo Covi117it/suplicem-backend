@@ -3,6 +3,7 @@ import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserF
 import { FirebaseAuthService } from "../../../infrastructure/services/FirebaseAuthService";
 import { CreateUserUseCase } from "../../../application/use-cases/user/CreateUserUseCase";
 import { GetAllUsersUseCase } from "../../../application/use-cases/user/GetAllUsersUseCase";
+import { GetUserByIdUseCase } from "../../../application/use-cases/user/GetUserByIdUseCase";
 import { UpdateUserStatusUseCase } from "../../../application/use-cases/user/UpdateUserStatusUseCase";
 import { UpdateUserUseCase } from "../../../application/use-cases/user/UpdateUserUseCase";
 import { User } from "../../../domain/entities/User";
@@ -11,16 +12,22 @@ const userRepo = new UserFirestoreRepository();
 const authService = new FirebaseAuthService();
 const createUserUseCase = new CreateUserUseCase(userRepo, authService);
 const getAllUsersUseCase = new GetAllUsersUseCase(userRepo);
+const getUserByIdUseCase = new GetUserByIdUseCase(userRepo);
 const updateUserStatusUseCase = new UpdateUserStatusUseCase(userRepo);
 const updateUserUseCase = new UpdateUserUseCase(userRepo);
 
 export class UserController {
   async create(req: Request, res: Response) {
     try {
-      await createUserUseCase.execute(req.body);
+      const file = req.file || (req.files && Array.isArray(req.files) ? (req.files as any)[0] : undefined);
+      const result = await createUserUseCase.execute(req.body, file);
       res
         .status(201)
-        .json({ success: true, message: "Usuario creado y verificación enviada" });
+        .json({
+          success: true,
+          message: "Usuario creado y verificación enviada",
+          ...result,
+        });
     } catch (error: any) {
       console.error("Error en UserController.create:", error);
       let errorMsg = error.message || "Error al crear el usuario";
@@ -71,6 +78,29 @@ export class UserController {
     } catch (error: any) {
       console.error(error);
       res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await getUserByIdUseCase.execute(id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "Usuario no encontrado",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        user,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error al obtener el usuario",
+      });
     }
   }
 

@@ -8,8 +8,11 @@ export const CreateTripSchema = z.object({
 });
 
 export const UpdateTripStatusSchema = z.object({
-  tripId: z.string().min(1, "tripId es requerido"),
-  status: z.enum(["available", "accepted", "started", "completed", "canceled"], {
-    message: "status no válido",
-  }),
+  tripId: z.string().optional(),
+  status: z.enum(
+    ["available", "accepted", "started", "in_progress", "completed", "canceled"],
+    {
+      message: "status no válido",
+    }
+  ),
 });

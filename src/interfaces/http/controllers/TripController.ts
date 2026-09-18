@@ -58,7 +58,10 @@ export class TripController {
 
   async getAvailable(req: Request, res: Response) {
     try {
-      const trips = await getAvailableTripsUseCase.execute();
+      const user = (req as any).user;
+      const isDriver = String(user?.userType || "").trim().toLowerCase() === "driver";
+      const driverId = isDriver ? user?.uid : undefined;
+      const trips = await getAvailableTripsUseCase.execute(driverId);
 
       res.status(200).json({
         success: true,
@@ -67,7 +70,7 @@ export class TripController {
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        message: error.message || "Error al obtener los viajes disponibles",
+        message: error.message || "Error al obtener todos los viajes",
       });
     }
   }
@@ -108,7 +111,8 @@ export class TripController {
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        message: error.message || "Error al obtener los viajes disponibles",
+        message:
+          error.message || "Error al obtener el historial de viajes del conductor",
       });
     }
   }
@@ -152,10 +156,35 @@ export class TripController {
 
       const trip = await getTripByIdUseCase.execute(tripId);
 
-      if (trip?.status !== "available") {
+      if (!trip) {
+        return res.status(404).json({
+          success: false,
+          message: "El viaje no existe",
+        });
+      }
+
+      if (trip.status !== "available") {
+        if (
+          trip.status === "accepted" &&
+          (trip.assignedDriverId === driverId || (trip as any).driverId === driverId)
+        ) {
+          return res.status(200).json({
+            success: true,
+            message: "Viaje aceptado correctamente",
+          });
+        }
+
         return res.status(403).json({
           success: false,
-          message: `El viaje ${trip?.tripNumber} ya no está disponible`,
+          message: `El viaje ${trip.tripNumber || tripId} ya no está disponible (estado: ${trip.status})`,
+        });
+      }
+
+      // Si el viaje fue asignado específicamente por el admin a otro chofer, no permitir que otro lo tome
+      if (trip.assignedDriverId && trip.assignedDriverId !== "" && trip.assignedDriverId !== driverId) {
+        return res.status(403).json({
+          success: false,
+          message: "Este viaje fue asignado específicamente a otro conductor",
         });
       }
 

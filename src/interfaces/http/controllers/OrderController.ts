@@ -6,39 +6,52 @@ import { GetAllOrdersUseCase } from "../../../application/use-cases/order/GetAll
 import { UpdateOrderStatusUseCase } from "../../../application/use-cases/order/UpdateOrderStatusUseCase";
 import { MarkDeliveryCompletedUseCase } from "../../../application/use-cases/order/MarkDeliveryCompletedUseCase";
 import { UpdateOrderDeliveriesUseCase } from "../../../application/use-cases/order/UpdateOrderDeliveriesUseCase";
+import { AttachDeliveryProofUseCase } from "../../../application/use-cases/order/AttachDeliveryProofUseCase";
 import { uploadDeliveryImage } from "../../../domain/services/ImageStorageService";
-import { firestore } from "../../../config/firebase";
 import { GetOrderByIdUseCase } from "../../../application/use-cases/order/GetOrderByIdUseCase";
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
 import { GetOrderTrackingUseCase } from "../../../application/use-cases/order/GetOrderTrackingUseCase";
 import { LocationFirestoreRepository } from "../../../infrastructure/firestore/LocationFirestoreRepository";
 import { ProductFirestoreRepository } from "../../../infrastructure/firestore/ProductFirestoreRepository";
 import { TripFirestoreRepository } from "../../../infrastructure/firestore/TripFirestoreRepository";
+import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 
-const tripRepo = new TripFirestoreRepository();
-const locationRepo = new LocationFirestoreRepository();
+// Proveedores de infraestructura por defecto para inyección de dependencias
+const defaultTripRepo = new TripFirestoreRepository();
+const defaultLocationRepo = new LocationFirestoreRepository();
+const defaultOrderRepo = new OrderFirestoreRepository();
+const defaultUserRepo = new UserFirestoreRepository();
+const defaultProductRepo = new ProductFirestoreRepository();
 
-const orderRepo = new OrderFirestoreRepository();
-const userRepo = new UserFirestoreRepository();
-const productRepo = new ProductFirestoreRepository();
-const createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo);
-const getMyOrdersUseCase = new GetMyOrdersUseCase(orderRepo, userRepo);
-const getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo);
-const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo); 
-const getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo);
-const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo);
-const markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(
-  orderRepo
-);
-const updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(
-  orderRepo
-);
+const defaultCreateOrderUseCase = new CreateOrderUseCase(defaultOrderRepo, defaultProductRepo);
+const defaultGetMyOrdersUseCase = new GetMyOrdersUseCase(defaultOrderRepo, defaultUserRepo);
+const defaultGetOrderTrackingUseCase = new GetOrderTrackingUseCase(defaultOrderRepo, defaultTripRepo, defaultLocationRepo);
+const defaultGetOrderByIdUseCase = new GetOrderByIdUseCase(defaultOrderRepo);
+const defaultGetAllOrdersUseCase = new GetAllOrdersUseCase(defaultOrderRepo, defaultUserRepo);
+const defaultUpdateOrderStatusUseCase = new UpdateOrderStatusUseCase(defaultOrderRepo, defaultTripRepo);
+const defaultMarkDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(defaultOrderRepo);
+const defaultAttachDeliveryProofUseCase = new AttachDeliveryProofUseCase(defaultOrderRepo);
+const defaultUpdateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(defaultOrderRepo);
 
 export class OrderController {
+  constructor(
+    private createOrderUseCase: CreateOrderUseCase = defaultCreateOrderUseCase,
+    private getMyOrdersUseCase: GetMyOrdersUseCase = defaultGetMyOrdersUseCase,
+    private getOrderTrackingUseCase: GetOrderTrackingUseCase = defaultGetOrderTrackingUseCase,
+    private getOrderByIdUseCase: GetOrderByIdUseCase = defaultGetOrderByIdUseCase,
+    private getAllOrdersUseCase: GetAllOrdersUseCase = defaultGetAllOrdersUseCase,
+    private updateOrderStatusUseCase: UpdateOrderStatusUseCase = defaultUpdateOrderStatusUseCase,
+    private markDeliveryCompletedUseCase: MarkDeliveryCompletedUseCase = defaultMarkDeliveryCompletedUseCase,
+    private attachDeliveryProofUseCase: AttachDeliveryProofUseCase = defaultAttachDeliveryProofUseCase,
+    private updateOrderDeliveriesUseCase: UpdateOrderDeliveriesUseCase = defaultUpdateOrderDeliveriesUseCase,
+    private orderRepo: OrderRepository = defaultOrderRepo
+  ) {}
+
   async create(req: Request, res: Response) {
     try {
       const {
         deliveryType,
+        deliveryAddress,
         deliveries,
         items,
         comments,
@@ -54,9 +67,11 @@ export class OrderController {
           message: "Faltan datos requeridos",
         });
       }
-      const { orderId, orderNumber } = await createOrderUseCase.execute({
+
+      const { orderId, orderNumber } = await this.createOrderUseCase.execute({
         userId,
         deliveryType,
+        deliveryAddress,
         deliveries,
         items,
         comments,
@@ -65,16 +80,6 @@ export class OrderController {
         bankAccountId,
         creditNote,
       });
-
-      // try {
-      //   await sendEmail(
-      //     "dmartinezenfocado@gmail.com",
-      //     `Orden ${orderNumber} creada satisfactoriamente`,
-      //     `Hola, se creó la orden ${orderNumber}`
-      //   );
-      // } catch (error) {
-      //   // Do Nothing
-      // }
 
       res.status(201).json({
         success: true,
@@ -92,7 +97,7 @@ export class OrderController {
   async getTracking(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const order = await orderRepo.getById(id);
+      const order = await this.orderRepo.getById(id);
       if (!order) {
         return res.status(404).json({
           success: false,
@@ -109,7 +114,7 @@ export class OrderController {
         });
       }
 
-      const tracking = await getOrderTrackingUseCase.execute(id);
+      const tracking = await this.getOrderTrackingUseCase.execute(id);
       res.status(200).json({
         success: true,
         tracking,
@@ -122,8 +127,7 @@ export class OrderController {
     }
   }
 
-
-   async getMyOrders(req: Request, res: Response) {
+  async getMyOrders(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.uid;
       const { search, status } = req.query;
@@ -135,7 +139,7 @@ export class OrderController {
         });
       }
 
-      const orders = await getMyOrdersUseCase.execute(userId, {
+      const orders = await this.getMyOrdersUseCase.execute(userId, {
         search: typeof search === "string" ? search : undefined,
         status: typeof status === "string" ? status : undefined,
       });
@@ -155,7 +159,7 @@ export class OrderController {
   async getById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const order = await getOrderByIdUseCase.execute(id);
+      const order = await this.getOrderByIdUseCase.execute(id);
 
       if (!order) {
         return res
@@ -181,7 +185,7 @@ export class OrderController {
     }
   }
 
-   async getAll(req: Request, res: Response) {
+  async getAll(req: Request, res: Response) {
     try {
       const { status, deliveryType, userId, withoutTrip } = req.query;
       const filters: any = {};
@@ -197,7 +201,7 @@ export class OrderController {
       if (withoutTrip !== undefined) {
         filters.withoutTrip = String(withoutTrip).toLowerCase() === "true";
       }
-      const orders = await getAllOrdersUseCase.execute(filters);
+      const orders = await this.getAllOrdersUseCase.execute(filters);
       res.status(200).json({ success: true, orders });
     } catch (error: any) {
       res.status(500).json({
@@ -210,7 +214,7 @@ export class OrderController {
   async updateStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { status, reason } = req.body;
+      const { status, reason, driverId } = req.body;
 
       if (!id || !["approved", "rejected"].includes(status)) {
         return res.status(400).json({
@@ -219,7 +223,7 @@ export class OrderController {
         });
       }
 
-      await updateOrderStatusUseCase.execute(id, status, reason);
+      await this.updateOrderStatusUseCase.execute(id, status, reason, driverId);
 
       res.status(200).json({
         success: true,
@@ -236,7 +240,7 @@ export class OrderController {
   async completeDelivery(req: Request, res: Response) {
     try {
       const { id, index } = req.params;
-      const parsedIndex = parseInt(index);
+      const parsedIndex = parseInt(index, 10);
 
       if (isNaN(parsedIndex)) {
         return res.status(400).json({
@@ -245,7 +249,11 @@ export class OrderController {
         });
       }
 
-      await markDeliveryCompletedUseCase.execute(id, parsedIndex);
+      await this.markDeliveryCompletedUseCase.execute({
+        orderId: id,
+        index: parsedIndex,
+        comment: req.body?.comment,
+      });
 
       res.status(200).json({
         success: true,
@@ -265,22 +273,26 @@ export class OrderController {
       const parsedIndex = parseInt(index, 10);
       const comment = req.body.comment;
       const image = req.file;
+
       if (isNaN(parsedIndex)) {
         return res.status(400).json({
           success: false,
           message: "Índice de entrega inválido",
         });
       }
+
       let imageUrl: string | undefined;
       if (image) {
         imageUrl = await uploadDeliveryImage(image, id, parsedIndex);
       }
-      await markDeliveryCompletedUseCase.execute({
+
+      await this.markDeliveryCompletedUseCase.execute({
         orderId: id,
         index: parsedIndex,
         comment,
         imageUrl,
       });
+
       res.status(200).json({
         success: true,
         message: "Entrega completada y comprobante guardado exitosamente",
@@ -297,44 +309,34 @@ export class OrderController {
   async attachToDelivery(req: Request, res: Response) {
     try {
       const { id, index } = req.params;
-      const parsedIndex = parseInt(index);
+      const parsedIndex = parseInt(index, 10);
       const comment = req.body.comment;
       const image = req.file;
 
-      const ref = firestore.collection("orders").doc(id);
-      const snap = await ref.get();
-
-      if (!snap.exists) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Orden no encontrada" });
+      if (isNaN(parsedIndex)) {
+        return res.status(400).json({
+          success: false,
+          message: "Índice de entrega inválido",
+        });
       }
 
-      const data = snap.data();
-      if (!data?.deliveries || !data.deliveries[parsedIndex]) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Entrega no encontrada" });
-      }
-
-      if (comment) {
-        data.deliveries[parsedIndex].comment = comment;
-      }
-
+      let imageUrl: string | undefined;
       if (image) {
-        const url = await uploadDeliveryImage(image, id, parsedIndex);
-        data.deliveries[parsedIndex].imageUrl = url;
-
-        await ref.update({ deliveries: data.deliveries });
-
-        res
-          .status(200)
-          .json({
-            success: true,
-            message: "Entrega actualizada correctamente",
-            url
-          });
+        imageUrl = await uploadDeliveryImage(image, id, parsedIndex);
       }
+
+      await this.attachDeliveryProofUseCase.execute({
+        orderId: id,
+        index: parsedIndex,
+        comment,
+        imageUrl,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Entrega actualizada correctamente",
+        url: imageUrl,
+      });
     } catch (error: any) {
       res.status(500).json({
         success: false,
@@ -355,7 +357,7 @@ export class OrderController {
         });
       }
 
-      const updatedOrder = await updateOrderDeliveriesUseCase.execute(
+      const updatedOrder = await this.updateOrderDeliveriesUseCase.execute(
         id,
         deliveryType,
         deliveries

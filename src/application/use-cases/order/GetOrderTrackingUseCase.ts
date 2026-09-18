@@ -10,6 +10,8 @@ export interface OrderTrackingDto {
     id: string;
     tripNumber: string;
     status: string;
+    assignedDriverId?: string;
+    driver?: any;
   } | null;
   driver: {
     id?: string;
@@ -68,6 +70,8 @@ export class GetOrderTrackingUseCase {
             id: trip.id || "",
             tripNumber: trip.tripNumber,
             status: trip.status,
+            assignedDriverId: trip.assignedDriverId || (driverData?.id ?? ""),
+            driver: driverData,
           }
         : null,
       driver: driverData

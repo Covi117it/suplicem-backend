@@ -2,7 +2,7 @@ import { Trip } from "../entities/Trip";
 
 export interface TripRepository {
   create(trip: Trip): Promise<string>;
-  getAvailable(): Promise<Trip[]>;
+  getAvailable(driverId?: string): Promise<Trip[]>;
   getById(tripId: string): Promise<Trip | null>;
   getAll(): Promise<Trip[]>;
   getDriverTripHistory(userId: string): Promise<Trip[]>;
