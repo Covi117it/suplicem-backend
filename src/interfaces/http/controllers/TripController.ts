@@ -137,15 +137,18 @@ export class TripController {
       const tripId = req.params.id || req.body.tripId;
       const { status } = req.body;
       if (!tripId || !status) return res.status(400).json({ success: false, message: "tripId y status son requeridos" });
-
+      const authUser = (req as any).user;
+      const userId = authUser?.uid;
+      const userRole = authUser?.userType;
       if (status === "completed") {
-        await this.completeTripUseCase.execute(tripId);
+        await this.completeTripUseCase.execute(tripId, userId, userRole);
       } else {
-        await this.updateTripStatusUseCase.execute(tripId, status);
+        await this.updateTripStatusUseCase.execute(tripId, status, userId, userRole);
       }
       res.status(200).json({ success: true, message: `Status actualizado correctamente a ${status}` });
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message || "Error al actualizar status" });
+      const status = error.message?.includes("permiso") ? 403 : error.message?.includes("encontrado") ? 404 : 400;
+      res.status(status).json({ success: false, message: error.message || "Error al actualizar status" });
     }
   }
 

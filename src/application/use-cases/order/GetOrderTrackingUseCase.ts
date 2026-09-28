@@ -34,13 +34,31 @@ export class GetOrderTrackingUseCase {
     private locationRepo: LocationRepository
   ) {}
 
-  async execute(orderId: string): Promise<OrderTrackingDto | null> {
+   async execute(
+    orderId: string,
+    userId?: string,
+    userRole?: string
+  ): Promise<OrderTrackingDto | null> {
     const order = await this.orderRepo.getById(orderId);
     if (!order) {
       return null;
     }
 
+    if (userRole === "client" && order.userId !== userId) {
+      throw new Error("No tienes permiso para ver el tracking de esta orden.");
+    }
     const trip = await this.tripRepo.getTripByOrderId(orderId);
+
+    if (userRole === "driver") {
+      const assignedDriver =
+        trip?.assignedDriverId ||
+        (trip as any)?.driverId ||
+        trip?.driver?.id ||
+        trip?.driver?.uid;
+      if (assignedDriver !== userId) {
+        throw new Error("No tienes permiso para ver el tracking de esta orden porque no eres el chofer asignado.");
+      }
+    }
 
     let driverData: any = null;
     let locationData: { latitude: number; longitude: number; updatedAt?: string } | null = null;
