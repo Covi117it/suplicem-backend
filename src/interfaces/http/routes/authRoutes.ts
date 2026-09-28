@@ -1,5 +1,10 @@
 import { validate } from "../middlewares/validate";
-import { LoginSchema, RefreshTokenSchema, RecoverPasswordSchema } from "../schemas/authSchemas";
+import {
+  LoginSchema,
+  RefreshTokenSchema,
+  RecoverPasswordSchema,
+  ResendVerificationSchema,
+} from "../schemas/authSchemas";
 import { Router } from "express";
 import { AuthController } from "../controllers/AuthController";
 import { authenticate } from "../middlewares/authenticate";
@@ -14,7 +19,10 @@ export const authRoutes = (router: Router) => {
   router.get("/auth/me", authenticate, (req, res) =>
     authController.getCurrentUser(req, res)
   );
- router.post("/auth/recover-password", validate(RecoverPasswordSchema), (req, res) =>
+  router.post("/auth/recover-password", validate(RecoverPasswordSchema), (req, res) =>
     authController.recoverPassword(req, res)
+  );
+  router.post("/auth/resend-verification", validate(ResendVerificationSchema), (req, res) =>
+    authController.resendVerification(req, res)
   );
 };

@@ -188,4 +188,48 @@ export class RegistrationBotService {
 
     await this.dispatchEmail(email, emailSubject, emailHtml);
   }
+
+  /**
+   * Bot que despacha correo de verificación con enlace directo
+   */
+  async sendVerificationEmailBot(email: string, link: string): Promise<void> {
+    console.log(
+      `🤖 [Bot de Correo Suplicem] Enviando correo de verificación de cuenta para: ${email}`
+    );
+
+    const emailSubject = "✉️ Verifica tu correo electrónico - Suplicem";
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        <div style="background-color: #0F294A; padding: 18px; text-align: center; border-radius: 6px 6px 0 0;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">SUPLICEM</h1>
+          <p style="color: #E31E24; margin: 4px 0 0 0; font-weight: bold; font-size: 13px;">Logística & Distribución de Materiales</p>
+        </div>
+
+        <div style="padding: 24px; color: #334155;">
+          <h2 style="color: #0F294A; margin-top: 0;">Verifica tu correo electrónico</h2>
+          <p style="font-size: 15px; line-height: 1.6;">
+            Hemos recibido una solicitud para reenviar el enlace de verificación para tu cuenta en <strong>Suplicem</strong>.
+          </p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${link}" style="background-color: #E31E24; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">
+              Verificar mi Correo
+            </a>
+          </div>
+
+          <p style="font-size: 13px; color: #64748B; line-height: 1.5;">
+            Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:<br />
+            <a href="${link}" style="color: #0284C7; word-break: break-all;">${link}</a>
+          </p>
+
+          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8;">
+            <p>🤖 Si no solicitaste este correo, puedes ignorarlo de forma segura.</p>
+            <p>© ${new Date().getFullYear()} Suplicem Dominicana. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await this.dispatchEmail(email, emailSubject, emailHtml);
+  }
 }

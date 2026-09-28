@@ -12,3 +12,12 @@ export const RefreshTokenSchema = z.object({
 export const RecoverPasswordSchema = z.object({
   email: z.string().email("Formato de correo electrónico no válido"),
 });
+
+export const ResendVerificationSchema = z
+  .object({
+    email: z.string().email("Formato de correo electrónico no válido").optional(),
+    idToken: z.string().optional(),
+  })
+  .refine((data) => data.email || data.idToken, {
+    message: "Debe proporcionar el correo electrónico o el idToken",
+  });
