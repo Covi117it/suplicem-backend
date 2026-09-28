@@ -114,6 +114,15 @@ export class FirebaseAuthService implements AuthService {
     return { emailVerified: userRecord.emailVerified };
   }
 
+  async getUserByEmail(email: string) {
+    const userRecord = await auth.getUserByEmail(email);
+    return { emailVerified: userRecord.emailVerified, uid: userRecord.uid };
+  }
+
+  async generateEmailVerificationLink(email: string): Promise<string> {
+    return await auth.generateEmailVerificationLink(email);
+  }
+
   async sendPushNotification(token: string, title: string, body: string): Promise<void>  {
     await axios.post(
       "https://fcm.googleapis.com/fcm/send",

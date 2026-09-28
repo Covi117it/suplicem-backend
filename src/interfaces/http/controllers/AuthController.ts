@@ -5,16 +5,20 @@ import { RefreshTokenUseCase } from "../../../application/use-cases/auth/Refresh
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
 import { GetCurrentUserUseCase } from "../../../application/use-cases/user/GetCurrentUserUseCase";
 import { RecoverPasswordUseCase } from "../../../application/use-cases/auth/RecoverPasswordUseCase";
+import { ResendVerificationUseCase } from "../../../application/use-cases/auth/ResendVerificationUseCase";
+import { RegistrationBotService } from "../../../infrastructure/services/RegistrationBotService";
 
 const authService = new FirebaseAuthService();
 const userRepo = new UserFirestoreRepository();
+const botService = new RegistrationBotService();
 
 export class AuthController {
   constructor(
     private loginUseCase = new LoginUseCase(authService),
     private refreshTokenUseCase = new RefreshTokenUseCase(authService),
     private recoverPasswordUseCase = new RecoverPasswordUseCase(authService),
-    private getCurrentUserUseCase = new GetCurrentUserUseCase(userRepo)
+    private getCurrentUserUseCase = new GetCurrentUserUseCase(userRepo),
+    private resendVerificationUseCase = new ResendVerificationUseCase(authService, botService)
   ) {}
 
   async login(req: Request, res: Response) {
@@ -96,6 +100,22 @@ export class AuthController {
       res.status(error.message === "Usuario no encontrado" ? 404 : 500).json({
         success: false,
         message: error.message || "Error al obtener el usuario",
+      });
+    }
+  }
+
+  async resendVerification(req: Request, res: Response) {
+    try {
+      const { email, idToken } = req.body;
+      const result = await this.resendVerificationUseCase.execute({ email, idToken });
+      res.status(200).json(result);
+    } catch (error: any) {
+      console.error("Error en resendVerification:", error?.message || error);
+      const isNotFound = error.message?.includes("No existe");
+      const isAlreadyVerified = error.message?.includes("ya se encuentra verificada");
+      res.status(isNotFound ? 404 : isAlreadyVerified ? 400 : 500).json({
+        success: false,
+        message: error.message || "Error al reenviar correo de verificación",
       });
     }
   }
