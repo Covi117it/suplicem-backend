@@ -3,14 +3,29 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 export class UpdateTripStatusUseCase {
   constructor(private tripRepo: TripRepository) {}
 
-  async execute(tripId: string, targetStatus: string): Promise<void> {
+  async execute(
+    tripId: string,
+    targetStatus: string,
+    userId?: string,
+    userRole?: string
+  ): Promise<void> {
     if (!tripId || !targetStatus) {
       throw new Error("ID del viaje o status faltante.");
     }
-
     const trip = await this.tripRepo.getById(tripId);
     if (!trip) {
       throw new Error("El viaje no fue encontrado.");
+    }
+    
+    if (userRole === "driver") {
+      const assignedDriver =
+        trip.assignedDriverId ||
+        (trip as any).driverId ||
+        trip.driver?.id ||
+        trip.driver?.uid;
+      if (assignedDriver !== userId) {
+        throw new Error("No tienes permiso para modificar este viaje porque no eres el conductor asignado.");
+      }
     }
 
     const currentStatus = trip.status;

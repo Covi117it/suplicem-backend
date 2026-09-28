@@ -55,23 +55,25 @@ export class OrderController {
     }
   }
 
-  async getTracking(req: Request, res: Response) {
+    async getTracking(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const order = await this.getOrderByIdUseCase.execute(id);
-      if (!order) {
+      const authUser = (req as any).user;
+
+      const tracking = await this.getOrderTrackingUseCase.execute(
+        id,
+        authUser?.uid,
+        authUser?.userType
+      );
+
+      if (!tracking) {
         return res.status(404).json({ success: false, message: "Orden no encontrada" });
       }
 
-      const authUser = (req as any).user;
-      if (authUser?.userType === "client" && order.userId !== authUser.uid) {
-        return res.status(403).json({ success: false, message: "No tienes permiso para ver el tracking de esta orden" });
-      }
-
-      const tracking = await this.getOrderTrackingUseCase.execute(id);
       res.status(200).json({ success: true, tracking });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message || "Error al obtener el tracking" });
+      const status = error.message?.includes("permiso") ? 403 : 500;
+      res.status(status).json({ success: false, message: error.message || "Error al obtener el tracking" });
     }
   }
 
