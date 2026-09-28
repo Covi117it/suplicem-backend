@@ -1,26 +1,28 @@
 import { v4 as uuid } from "uuid";
 import { storage } from "../../config/firebase";
 
-export const uploadDeliveryImage = async (file: Express.Multer.File, orderId: string, index: number): Promise<string> => {
+export const uploadDeliveryImage = async (
+  file: Express.Multer.File,
+  orderId: string,
+  index: number
+): Promise<string> => {
   try {
     const bucket = storage.bucket();
     const fileName = `orders/${orderId}/delivery_${index}_${Date.now()}.jpg`;
     const fileRef = bucket.file(fileName);
+    const downloadToken = uuid();
 
     await fileRef.save(file.buffer, {
-      contentType: file.mimetype,
-      public: true,
+      contentType: file.mimetype || "image/jpeg",
       metadata: {
-        firebaseStorageDownloadTokens: uuid(),
+        firebaseStorageDownloadTokens: downloadToken,
       },
     });
 
-    return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${downloadToken}`;
   } catch (error: any) {
-    console.warn("Advertencia en Firebase Storage uploadDeliveryImage:", error?.message || error, "- utilizando fallback base64");
-    const mime = file.mimetype || "image/jpeg";
-    const base64 = file.buffer.toString("base64");
-    return `data:${mime};base64,${base64}`;
+    console.error("Error en Firebase Storage uploadDeliveryImage:", error);
+    throw new Error("No se pudo almacenar la evidencia fotográfica de la entrega en Storage.");
   }
 };
 
@@ -34,23 +36,20 @@ export const uploadIdentificationImage = async (
   try {
     const bucket = storage.bucket();
     const fileRef = bucket.file(filePath);
+    const downloadToken = uuid();
 
     await fileRef.save(file.buffer, {
       contentType: file.mimetype || "image/jpeg",
-      public: true,
       metadata: {
-        firebaseStorageDownloadTokens: uuid(),
+        firebaseStorageDownloadTokens: downloadToken,
       },
     });
 
-    const url = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${downloadToken}`;
     return { url, filePath };
   } catch (error: any) {
-    console.warn("Advertencia en Firebase Storage uploadIdentificationImage:", error?.message || error, "- utilizando fallback base64");
-    const mime = file.mimetype || "image/jpeg";
-    const base64 = file.buffer.toString("base64");
-    const dataUrl = `data:${mime};base64,${base64}`;
-    return { url: dataUrl, filePath };
+    console.error("Error en Firebase Storage uploadIdentificationImage:", error);
+    throw new Error("No se pudo almacenar el documento de identidad en Storage.");
   }
 };
 
@@ -60,11 +59,15 @@ export const deleteStorageFile = async (filePathOrUrl: string): Promise<void> =>
     let filePath = filePathOrUrl;
 
     if (filePath.startsWith("http")) {
-      const bucketPrefix = `https://storage.googleapis.com/${bucket.name}/`;
-      if (filePath.startsWith(bucketPrefix)) {
-        filePath = filePath.replace(bucketPrefix, "").split("?")[0];
+      const gcsPrefix = `https://storage.googleapis.com/${bucket.name}/`;
+      const fbPrefix = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/`;
+
+      if (filePath.startsWith(gcsPrefix)) {
+        filePath = filePath.replace(gcsPrefix, "").split("?")[0];
+      } else if (filePath.startsWith(fbPrefix)) {
+        const rawPath = filePath.replace(fbPrefix, "").split("?")[0];
+        filePath = decodeURIComponent(rawPath);
       } else {
-        // Es una URL externa que no pertenece a nuestro Storage, retornar sin error
         return;
       }
     }
@@ -88,26 +91,19 @@ export const uploadReceiptImage = async (
     const ext = (file.mimetype && file.mimetype.split("/")[1]) || "jpg";
     const fileName = `receipts/${userId}/comprobante_${Date.now()}.${ext}`;
     const fileRef = bucket.file(fileName);
+    const downloadToken = uuid();
 
     await fileRef.save(file.buffer, {
       contentType: file.mimetype || "image/jpeg",
-      public: true,
       metadata: {
-        firebaseStorageDownloadTokens: uuid(),
+        firebaseStorageDownloadTokens: downloadToken,
       },
     });
 
-    return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${downloadToken}`;
   } catch (error: any) {
-    console.warn(
-      "Advertencia en Firebase Storage uploadReceiptImage:",
-      error?.message || error,
-      "- utilizando fallback base64"
-    );
-
-    const mime = file.mimetype || "image/jpeg";
-    const base64 = file.buffer.toString("base64");
-    return `data:${mime};base64,${base64}`;
+    console.error("Error en Firebase Storage uploadReceiptImage:", error);
+    throw new Error("No se pudo almacenar el comprobante de pago en Storage.");
   }
 };
 
@@ -119,11 +115,13 @@ export const uploadProductImage = async (
     const ext = (file.mimetype && file.mimetype.split("/")[1]) || "jpg";
     const fileName = `products/prod_${Date.now()}.${ext}`;
     const fileRef = bucket.file(fileName);
+    const downloadToken = uuid();
+
     await fileRef.save(file.buffer, {
       contentType: file.mimetype || "image/jpeg",
-      public: true,
+      public: true, // El catálogo de productos sí puede ser de lectura pública
       metadata: {
-        firebaseStorageDownloadTokens: uuid(),
+        firebaseStorageDownloadTokens: downloadToken,
       },
     });
     return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
