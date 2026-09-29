@@ -3,6 +3,7 @@ import { normalizeOrderData } from "../middlewares/normalizeOrderData";
 import { OrderController } from "../controllers/OrderController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
+import { ordersLimiter } from "../middlewares/rateLimiter";
 import { validate } from "../middlewares/validate";
 import {
   CreateOrderSchema,
@@ -21,14 +22,13 @@ const upload = multer({
 
 export const orderRoutes = (router: Router) => {
   const orderController = new OrderController();
-
   router.get("/orders/:id/tracking", authenticate, async (req, res) => {
     await orderController.getTracking(req, res);
   });
 
-  // 1. Crear orden (Clientes)
   router.post(
     "/orders",
+    ordersLimiter,
     authenticate,
     requireRole(["client"]),
     upload.single("receiptImage"),

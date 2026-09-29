@@ -59,6 +59,16 @@ export class UserController {
   async getById(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const authUser = (req as any).user;
+
+      // Prevención de BOLA/IDOR: Solo el propio usuario o un admin pueden consultar este perfil
+      if (authUser?.userType !== "admin" && authUser?.uid !== id) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para ver la información de este usuario",
+        });
+      }
+
       const user = await getUserByIdUseCase.execute(id);
       if (!user) {
         return res.status(404).json({

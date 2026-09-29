@@ -102,19 +102,32 @@ export class TripController {
 
   async getById(req: Request, res: Response) {
     try {
-      const trip = await this.getTripDetailsUseCase.execute(req.params.id);
+      const authUser = (req as any).user;
+      const trip = await this.getTripDetailsUseCase.execute(req.params.id, authUser);
+      if (!trip) {
+        return res.status(404).json({ success: false, message: "Viaje no encontrado" });
+      }
       res.status(200).json({ success: true, trip });
     } catch (error: any) {
-      res.status(404).json({ success: false, message: error.message || "Error al obtener el viaje" });
+      const status = error.message?.includes("permiso") ? 403 : 404;
+      res.status(status).json({ success: false, message: error.message || "Error al obtener el viaje" });
     }
   }
 
   async getTripByOrderId(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
       const trip = await this.getTripByOrderIdUseCase.execute(req.params.id);
+      if (!trip) {
+        return res.status(404).json({ success: false, message: "Viaje no encontrado" });
+      }
+      if (authUser?.userType === "driver" && trip.assignedDriverId !== authUser.uid) {
+        return res.status(403).json({ success: false, message: "No tienes permiso para ver este viaje" });
+      }
       res.status(200).json({ success: true, trip });
     } catch (error: any) {
-      res.status(404).json({ success: false, message: error.message || "Error al obtener el viaje" });
+      const status = error.message?.includes("permiso") ? 403 : 404;
+      res.status(status).json({ success: false, message: error.message || "Error al obtener el viaje" });
     }
   }
 
