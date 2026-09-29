@@ -25,10 +25,15 @@ export const normalizeOrderData = (req: Request, _res: Response, next: NextFunct
     } catch (e) {}
   }
 
-  if (typeof body.deliveries === "string") {
+    if (typeof body.deliveries === "string") {
     try {
       body.deliveries = JSON.parse(body.deliveries);
     } catch (e) {}
+  }
+
+  const headerKey = req.headers["idempotency-key"] || req.headers["x-idempotency-key"];
+  if (headerKey && typeof headerKey === "string" && !body.idempotencyKey) {
+    body.idempotencyKey = headerKey;
   }
 
   req.body = body;

@@ -14,16 +14,19 @@ import { GetOrderTrackingUseCase } from "../../../application/use-cases/order/Ge
 import { LocationFirestoreRepository } from "../../../infrastructure/firestore/LocationFirestoreRepository";
 import { ProductFirestoreRepository } from "../../../infrastructure/firestore/ProductFirestoreRepository";
 import { TripFirestoreRepository } from "../../../infrastructure/firestore/TripFirestoreRepository";
+import { IdempotencyFirestoreRepository } from "../../../infrastructure/firestore/IdempotencyFirestoreRepository";
+
+
 
 const tripRepo = new TripFirestoreRepository();
 const locationRepo = new LocationFirestoreRepository();
 const orderRepo = new OrderFirestoreRepository();
 const userRepo = new UserFirestoreRepository();
 const productRepo = new ProductFirestoreRepository();
-
+const idempotencyRepo = new IdempotencyFirestoreRepository();
 export class OrderController {
   constructor(
-    private createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo),
+    private createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo, idempotencyRepo, userRepo),
     private getMyOrdersUseCase = new GetMyOrdersUseCase(orderRepo, userRepo),
     private getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo),
     private getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo),
@@ -33,21 +36,23 @@ export class OrderController {
     private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo),
     private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo)
   ) {}
-
     async create(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
       let receiptImageUrl = req.body.receiptImage;
-
       // Si el cliente adjuntó el archivo del comprobante, subirlo a Firebase Storage
       if (req.file) {
         receiptImageUrl = await uploadReceiptImage(req.file, authUser?.uid || "general");
       }
-
+      const idempotencyKey =
+        (req.headers["idempotency-key"] as string) ||
+        (req.headers["x-idempotency-key"] as string) ||
+        req.body?.idempotencyKey;
       const { orderId, orderNumber } = await this.createOrderUseCase.execute({
         ...req.body,
         receiptImage: receiptImageUrl,
         userId: authUser?.uid,
+        idempotencyKey,
       });
       res.status(201).json({ success: true, orderId, orderNumber });
     } catch (error: any) {

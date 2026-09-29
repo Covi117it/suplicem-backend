@@ -23,4 +23,5 @@ export interface CreateOrderDto {
   creditNote?: string;                    
   comments?: string;
   receiptImage?: string;
+  idempotencyKey?: string;
 }
