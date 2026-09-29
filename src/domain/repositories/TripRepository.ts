@@ -2,6 +2,7 @@ import { Trip } from "../entities/Trip";
 
 export interface TripRepository {
   create(trip: Trip): Promise<string>;
+  createTripAtomic(trip: Trip, orderIds: string[]): Promise<string>;
   getAvailable(driverId?: string): Promise<Trip[]>;
   getById(tripId: string): Promise<Trip | null>;
   getAll(): Promise<Trip[]>;
@@ -18,5 +19,4 @@ export interface TripRepository {
     assignedDriverId: string;
     driver: any | null;
   } | null>;
-  createWithOrders(data: any): Promise<string>;
 }
