@@ -6,7 +6,6 @@ import { validate } from "../middlewares/validate";
 import {
   CreateTripSchema,
   UpdateTripStatusSchema,
-  CreateTripWithOrdersSchema,
   AcceptTripSchema,
 } from "../schemas/tripSchemas";
 
@@ -30,17 +29,6 @@ export const tripRoutes = (router: Router) => {
     validate(CreateTripSchema),
     async (req, res) => {
       await tripController.create(req, res);
-    }
-  );
-
-  // 1b. Crear viaje con órdenes asociadas (Solo Administradores)
-  router.post(
-    "/trips/create-with-orders",
-    authenticate,
-    requireRole(["admin"]),
-    validate(CreateTripWithOrdersSchema),
-    async (req, res) => {
-      await tripController.createWithOrders(req, res);
     }
   );
 

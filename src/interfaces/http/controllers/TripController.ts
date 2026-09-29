@@ -13,7 +13,6 @@ import { GetDriverActualTripsUseCase } from "../../../application/use-cases/trip
 import { GetTripByOrderIdUseCase } from "../../../application/use-cases/trip/GetTripByOrderIdUseCase";
 import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/GetDriverActiveTripUseCase";
 import { CompleteTripUseCase } from "../../../application/use-cases/trip/CompleteTripUseCase";
-import { CreateTripWithOrdersUseCase } from "../../../application/use-cases/trip/CreateTripWithOrdersUseCase";
 
 const tripRepo = new TripFirestoreRepository();
 const orderRepo = new OrderFirestoreRepository();
@@ -21,7 +20,6 @@ const orderRepo = new OrderFirestoreRepository();
 export class TripController {
   constructor(
     private createTripUseCase = new CreateTripUseCase(tripRepo, orderRepo),
-    private createTripWithOrdersUseCase = new CreateTripWithOrdersUseCase(tripRepo),
     private getAvailableTripsUseCase = new GetAvailableTripsUseCase(tripRepo),
     private getDriverTripHistoryUseCase = new GetDriverTripHistoryUseCase(tripRepo),
     private getDriverActualTripsUseCase = new GetDriverActualTripsUseCase(tripRepo),
@@ -149,15 +147,6 @@ export class TripController {
     } catch (error: any) {
       const status = error.message?.includes("permiso") ? 403 : error.message?.includes("encontrado") ? 404 : 400;
       res.status(status).json({ success: false, message: error.message || "Error al actualizar status" });
-    }
-  }
-
-  async createWithOrders(req: Request, res: Response) {
-    try {
-      const tripId = await this.createTripWithOrdersUseCase.execute(req.body);
-      res.status(201).json({ success: true, message: "Viaje con órdenes creado correctamente", tripId });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message || "Error al crear viaje con órdenes" });
     }
   }
 }

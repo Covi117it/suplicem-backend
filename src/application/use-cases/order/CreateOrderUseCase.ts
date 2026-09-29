@@ -1,21 +1,37 @@
 import { Order, OrderItem } from "../../../domain/entities/Order";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { ProductRepository } from "../../../domain/repositories/ProductRepository";
+import { IdempotencyRepository } from "../../../domain/repositories/IdempotencyRepository";
+import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { SynthIDDetectorService } from "../../../infrastructure/services/SynthIDDetectorService";
 import { CreateOrderDto } from "../../dtos/OrderDtos";
-import { firestore } from "../../../config/firebase";
 
 export class CreateOrderUseCase {
   private synthIDDetector = new SynthIDDetectorService();
 
   constructor(
     private orderRepo: OrderRepository,
-    private productRepo?: ProductRepository
+    private productRepo?: ProductRepository,
+    private idempotencyRepo?: IdempotencyRepository,
+    private userRepo?: UserRepository
   ) {}
 
   async execute(
     data: CreateOrderDto
   ): Promise<{ orderId: string; orderNumber: number }> {
+    // 1. Control de Idempotencia: Verificar si esta compra ya fue procesada
+    if (data.idempotencyKey && this.idempotencyRepo) {
+      const reservation = await this.idempotencyRepo.reserve(data.idempotencyKey, data.userId);
+      if (!reservation.reserved && reservation.existingRecord) {
+        if (reservation.existingRecord.status === "completed") {
+          return {
+            orderId: reservation.existingRecord.orderId,
+            orderNumber: reservation.existingRecord.orderNumber,
+          };
+        }
+      }
+    }
+
     const orderNumber = await this.orderRepo.getNextOrderNumber();
 
     let aiRiskFlag = false;
@@ -40,17 +56,15 @@ export class CreateOrderUseCase {
         throw new Error("Repositorio de productos no disponible.");
       }
 
-       const product = await this.productRepo.findById(item.productId);
+      const product = await this.productRepo.findById(item.productId);
       if (!product) {
         throw new Error(`Producto no encontrado o no disponible: ${item.productId}`);
       }
 
-    const unitPrice = product.price;
-    const name = product.name;
-    const unit = product.unit || "fundas";
-    const subtotal = Number((unitPrice * item.quantity).toFixed(2));
-
-    
+      const unitPrice = product.price;
+      const name = product.name;
+      const unit = product.unit || "fundas";
+      const subtotal = Number((unitPrice * item.quantity).toFixed(2));
 
       validatedItems.push({
         productId: item.productId,
@@ -67,17 +81,18 @@ export class CreateOrderUseCase {
     let userLastNames = "";
     let userEmail = "";
 
-    try {
-      const userDoc = await firestore.collection("users").doc(data.userId).get();
-      if (userDoc.exists) {
-        const u = userDoc.data();
-        userPhone = u?.phone || "";
-        userNames = u?.names || "";
-        userLastNames = u?.lastNames || "";
-        userEmail = u?.email || "";
+    if (this.userRepo) {
+      try {
+        const u = await this.userRepo.getById(data.userId);
+        if (u) {
+          userPhone = u.phone || "";
+          userNames = u.names || "";
+          userLastNames = u.lastNames || "";
+          userEmail = u.email || "";
+        }
+      } catch (e) {
+        console.warn("No se pudo obtener datos del usuario al crear orden:", e);
       }
-    } catch (e) {
-      console.warn("No se pudo obtener datos del usuario al crear orden:", e);
     }
 
     const resolvedDeliveryAddress =
@@ -117,6 +132,13 @@ export class CreateOrderUseCase {
       order.receiptImage = data.receiptImage;
     }
 
-    return await this.orderRepo.create(order);
+    const result = await this.orderRepo.create(order);
+
+    // 2. Guardar resultado de la compra para futuros reintentos de red
+    if (data.idempotencyKey && this.idempotencyRepo) {
+      await this.idempotencyRepo.complete(data.idempotencyKey, data.userId, result);
+    }
+
+    return result;
   }
 }

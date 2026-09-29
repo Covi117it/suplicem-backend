@@ -1,11 +1,14 @@
 import { Address } from "./User";
 
 export interface DeliveryDetail {
+  id?: string;
   productId: string;
   address?: Address;
   quantity: number;
   unit: string;
   status?: "pending" | "delivered";
+  delivered?: boolean;
+  imageUrl?: string;
   images?: string[];
   comment?: string;
   productName?: string;

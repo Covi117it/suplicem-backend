@@ -206,23 +206,32 @@ export class OrderFirestoreRepository implements OrderRepository {
     await firestore.collection("orders").doc(orderId).update(updateData);
   }
 
-  async markDeliveryAsCompleted(orderId: string, index: number): Promise<void> {
-    const ref = firestore.collection("orders").doc(orderId);
-    const snap = await ref.get();
+    async markDeliveryAsCompleted(orderId: string, index: number): Promise<void> {
+    await firestore.runTransaction(async (transaction) => {
+      const ref = firestore.collection("orders").doc(orderId);
+      const snap = await transaction.get(ref);
 
-    if (!snap.exists) {
-      throw new Error("Orden no encontrada");
-    }
+      if (!snap.exists) {
+        throw new Error("Orden no encontrada");
+      }
 
-    const data = snap.data();
-    if (!data?.deliveries || !data.deliveries[index]) {
-      throw new Error("Entrega no encontrada");
-    }
+      const data = snap.data();
+      if (!data?.deliveries || !data.deliveries[index]) {
+        throw new Error("Entrega no encontrada");
+      }
 
-    data.deliveries[index].delivered = true;
-    data.deliveries[index].status = "delivered";
+      const deliveries = [...data.deliveries];
+      deliveries[index] = {
+        ...deliveries[index],
+        delivered: true,
+        status: "delivered",
+      };
 
-    await ref.update({ deliveries: data.deliveries });
+      transaction.update(ref, {
+        deliveries,
+        updatedAt: new Date().toISOString(),
+      });
+    });
   }
 
   async completeDelivery(
@@ -230,28 +239,38 @@ export class OrderFirestoreRepository implements OrderRepository {
     index: number,
     options: { comment?: string; imageUrl?: string }
   ): Promise<void> {
-    const ref = firestore.collection("orders").doc(orderId);
-    const snap = await ref.get();
+    await firestore.runTransaction(async (transaction) => {
+      const ref = firestore.collection("orders").doc(orderId);
+      const snap = await transaction.get(ref);
 
-    if (!snap.exists) {
-      throw new Error("Orden no encontrada");
-    }
+      if (!snap.exists) {
+        throw new Error("Orden no encontrada");
+      }
 
-    const data = snap.data();
-    if (!data?.deliveries || !data.deliveries[index]) {
-      throw new Error("Entrega no encontrada");
-    }
+      const data = snap.data();
+      if (!data?.deliveries || !data.deliveries[index]) {
+        throw new Error("Entrega no encontrada");
+      }
 
-    data.deliveries[index].delivered = true;
-    data.deliveries[index].status = "delivered";
-    if (options.comment) {
-      data.deliveries[index].comment = options.comment;
-    }
-    if (options.imageUrl) {
-      data.deliveries[index].imageUrl = options.imageUrl;
-    }
+      const deliveries = [...data.deliveries];
+      const targetDelivery = { ...deliveries[index] };
 
-    await ref.update({ deliveries: data.deliveries });
+      targetDelivery.delivered = true;
+      targetDelivery.status = "delivered";
+      if (options.comment) {
+        targetDelivery.comment = options.comment;
+      }
+      if (options.imageUrl) {
+        targetDelivery.imageUrl = options.imageUrl;
+      }
+
+      deliveries[index] = targetDelivery;
+
+      transaction.update(ref, {
+        deliveries,
+        updatedAt: new Date().toISOString(),
+      });
+    });
   }
 
   async attachDeliveryProof(
@@ -259,26 +278,36 @@ export class OrderFirestoreRepository implements OrderRepository {
     index: number,
     options: { comment?: string; imageUrl?: string }
   ): Promise<void> {
-    const ref = firestore.collection("orders").doc(orderId);
-    const snap = await ref.get();
+    await firestore.runTransaction(async (transaction) => {
+      const ref = firestore.collection("orders").doc(orderId);
+      const snap = await transaction.get(ref);
 
-    if (!snap.exists) {
-      throw new Error("Orden no encontrada");
-    }
+      if (!snap.exists) {
+        throw new Error("Orden no encontrada");
+      }
 
-    const data = snap.data();
-    if (!data?.deliveries || !data.deliveries[index]) {
-      throw new Error("Entrega no encontrada");
-    }
+      const data = snap.data();
+      if (!data?.deliveries || !data.deliveries[index]) {
+        throw new Error("Entrega no encontrada");
+      }
 
-    if (options.comment) {
-      data.deliveries[index].comment = options.comment;
-    }
-    if (options.imageUrl) {
-      data.deliveries[index].imageUrl = options.imageUrl;
-    }
+      const deliveries = [...data.deliveries];
+      const targetDelivery = { ...deliveries[index] };
 
-    await ref.update({ deliveries: data.deliveries });
+      if (options.comment) {
+        targetDelivery.comment = options.comment;
+      }
+      if (options.imageUrl) {
+        targetDelivery.imageUrl = options.imageUrl;
+      }
+
+      deliveries[index] = targetDelivery;
+
+      transaction.update(ref, {
+        deliveries,
+        updatedAt: new Date().toISOString(),
+      });
+    });
   }
 
   async updateDeliveries(
@@ -336,9 +365,19 @@ export class OrderFirestoreRepository implements OrderRepository {
         }
       });
 
-      // Mapear la nueva asignación solicitada en la petición
+       // Identificar entregas ya completadas (historial inmutable con evidencias y comentarios)
+      const completedDeliveries = existingDeliveries.filter(
+        (del: any) => del.status === "delivered" || del.delivered === true
+      );
+      const completedIds = new Set(
+        completedDeliveries.map((d: any) => d.id).filter(Boolean)
+      );
+      // Mapear únicamente las asignaciones nuevas o pendientes solicitadas (excluyendo lo ya completado)
       const requestedQuantities = new Map<string, number>();
       for (const del of deliveries) {
+        if (completedIds.has(del.id) || del.status === "delivered" || del.delivered === true) {
+          continue;
+        }
         if (!del.productId) {
           throw new Error("Cada entrega debe especificar un producto válido.");
         }
@@ -347,13 +386,11 @@ export class OrderFirestoreRepository implements OrderRepository {
         requestedQuantities.set(del.productId, current + qty);
       }
 
-      // Validar disponibilidad real: (cantidad_pedida - (cantidad_entregada + reservada_activa))
       for (const [productId, requestedQty] of requestedQuantities.entries()) {
         const pedida = orderedQuantities.get(productId) || 0;
         const entregada = deliveredQuantities.get(productId) || 0;
         const reservadaActiva = 0;
         const disponible = pedida - (entregada + reservadaActiva);
-
         if (requestedQty > disponible) {
           const item = items.find((i: any) => i.productId === productId);
           const productName = item?.name || "el producto";
@@ -398,26 +435,34 @@ export class OrderFirestoreRepository implements OrderRepository {
         }
       }
 
-      const sanitizedDeliveries = deliveries.map((del: any) => ({
-        id: del.id || firestore.collection("orders").doc().id,
-        productId: del.productId,
-        quantity: Number(del.quantity) || 0,
-        unit: del.unit || "fundas",
-        status: del.status || "pending",
-        address: del.address || null,
-      }));
+      const sanitizedPendingDeliveries = deliveries
+        .filter(
+          (del: any) =>
+            !completedIds.has(del.id) &&
+            del.status !== "delivered" &&
+            del.delivered !== true
+        )
+        .map((del: any) => ({
+          ...del,
+          id: del.id || firestore.collection("orders").doc().id,
+          productId: del.productId,
+          quantity: Number(del.quantity) || 0,
+          unit: del.unit || "fundas",
+          status: "pending",
+          address: del.address || null,
+        }));
 
+      const finalDeliveries = [...completedDeliveries, ...sanitizedPendingDeliveries];
       transaction.update(orderRef, {
         deliveryType,
-        deliveries: sanitizedDeliveries,
+        deliveries: finalDeliveries,
         updatedAt: new Date().toISOString(),
       });
-
       return {
         id: orderSnap.id,
         ...orderData,
         deliveryType,
-        deliveries: sanitizedDeliveries,
+        deliveries: finalDeliveries,
       };
     });
   }

@@ -46,6 +46,7 @@ export const CreateOrderSchema = z
     paymentMethod: z.enum(["transfer", "credit"]).optional(),
     bankAccountId: z.string().optional(),
     creditNote: z.string().optional(),
+    idempotencyKey: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (
