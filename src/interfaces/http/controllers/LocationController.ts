@@ -25,6 +25,16 @@ export class LocationController {
 
   async get(req: Request, res: Response) {
     const { driverId } = req.params;
+    const authUser = (req as any).user;
+
+    // Prevención de BOLA/IDOR: Solo el propio conductor o un admin pueden consultar su GPS en vivo
+    if (authUser?.userType !== "admin" && authUser?.uid !== driverId) {
+      return res.status(403).json({
+        success: false,
+        message: "No tienes permiso para consultar la ubicación de este conductor",
+      });
+    }
+
     const data = await this.getLocationUseCase.execute(driverId);
 
     if (!data) {

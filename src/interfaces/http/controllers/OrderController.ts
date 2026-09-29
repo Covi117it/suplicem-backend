@@ -32,8 +32,8 @@ export class OrderController {
     private getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo),
     private getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo),
     private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo),
-    private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo),
-    private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo),
+    private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo, tripRepo),
+    private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo, tripRepo),
     private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo)
   ) {}
     async create(req: Request, res: Response) {
@@ -152,11 +152,19 @@ export class OrderController {
       const { id, index } = req.params;
       const parsedIndex = parseInt(index, 10);
       if (isNaN(parsedIndex)) return res.status(400).json({ success: false, message: "Índice inválido" });
+      const authUser = (req as any).user;
 
-      await this.markDeliveryCompletedUseCase.execute({ orderId: id, index: parsedIndex, comment: req.body?.comment });
+      await this.markDeliveryCompletedUseCase.execute({
+        orderId: id,
+        index: parsedIndex,
+        comment: req.body?.comment,
+        userId: authUser?.uid,
+        userRole: authUser?.userType,
+      });
       res.status(200).json({ success: true, message: "Entrega marcada como completada" });
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message || "Error al actualizar la entrega" });
+      const status = error.message?.includes("permiso") ? 403 : 400;
+      res.status(status).json({ success: false, message: error.message || "Error al actualizar la entrega" });
     }
   }
 
@@ -165,6 +173,7 @@ export class OrderController {
       const { id, index } = req.params;
       const parsedIndex = parseInt(index, 10);
       if (isNaN(parsedIndex)) return res.status(400).json({ success: false, message: "Índice de entrega inválido" });
+      const authUser = (req as any).user;
 
       const imageUrl = req.file ? await uploadDeliveryImage(req.file, id, parsedIndex) : undefined;
       await this.markDeliveryCompletedUseCase.execute({
@@ -172,6 +181,8 @@ export class OrderController {
         index: parsedIndex,
         comment: req.body?.comment,
         imageUrl,
+        userId: authUser?.uid,
+        userRole: authUser?.userType,
       });
 
       res.status(200).json({
@@ -180,7 +191,8 @@ export class OrderController {
         imageUrl,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message || "Error al completar la entrega" });
+      const status = error.message?.includes("permiso") ? 403 : 500;
+      res.status(status).json({ success: false, message: error.message || "Error al completar la entrega" });
     }
   }
 
@@ -189,6 +201,7 @@ export class OrderController {
       const { id, index } = req.params;
       const parsedIndex = parseInt(index, 10);
       if (isNaN(parsedIndex)) return res.status(400).json({ success: false, message: "Índice de entrega inválido" });
+      const authUser = (req as any).user;
 
       const imageUrl = req.file ? await uploadDeliveryImage(req.file, id, parsedIndex) : undefined;
       await this.attachDeliveryProofUseCase.execute({
@@ -196,11 +209,14 @@ export class OrderController {
         index: parsedIndex,
         comment: req.body?.comment,
         imageUrl,
+        userId: authUser?.uid,
+        userRole: authUser?.userType,
       });
 
       res.status(200).json({ success: true, message: "Entrega actualizada correctamente", url: imageUrl });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message || "Error al actualizar la entrega" });
+      const status = error.message?.includes("permiso") ? 403 : 500;
+      res.status(status).json({ success: false, message: error.message || "Error al actualizar la entrega" });
     }
   }
 
