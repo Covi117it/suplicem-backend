@@ -127,4 +127,15 @@ export const orderRoutes = (router: Router) => {
       await orderController.completeDeliveryWithProof(req, res);
     }
   );
+
+  // 10. Adjuntar o actualizar comprobante de transferencia (Clientes y Administradores)
+  router.patch(
+    "/orders/:id/receipt",
+    authenticate,
+    requireRole(["client", "admin"]),
+    upload.single("receiptImage"),
+    async (req, res) => {
+      await orderController.updateReceipt(req, res);
+    }
+  );
 };

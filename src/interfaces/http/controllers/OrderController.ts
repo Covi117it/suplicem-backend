@@ -7,6 +7,7 @@ import { UpdateOrderStatusUseCase } from "../../../application/use-cases/order/U
 import { MarkDeliveryCompletedUseCase } from "../../../application/use-cases/order/MarkDeliveryCompletedUseCase";
 import { UpdateOrderDeliveriesUseCase } from "../../../application/use-cases/order/UpdateOrderDeliveriesUseCase";
 import { AttachDeliveryProofUseCase } from "../../../application/use-cases/order/AttachDeliveryProofUseCase";
+import { UpdateOrderReceiptUseCase } from "../../../application/use-cases/order/UpdateOrderReceiptUseCase";
 import { uploadDeliveryImage, uploadReceiptImage } from "../../../domain/services/ImageStorageService";
 import { GetOrderByIdUseCase } from "../../../application/use-cases/order/GetOrderByIdUseCase";
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
@@ -34,7 +35,8 @@ export class OrderController {
     private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo),
     private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo, tripRepo),
     private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo, tripRepo),
-    private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo)
+    private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo),
+    private updateOrderReceiptUseCase = new UpdateOrderReceiptUseCase(orderRepo)
   ) {}
     async create(req: Request, res: Response) {
     try {
@@ -74,6 +76,7 @@ export class OrderController {
       if (!tracking) {
         return res.status(404).json({ success: false, message: "Orden no encontrada" });
       }
+
 
       res.status(200).json({ success: true, tracking });
     } catch (error: any) {
@@ -232,6 +235,37 @@ export class OrderController {
       });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message || "Error al actualizar las entregas" });
+    }
+  }
+
+  async updateReceipt(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const authUser = (req as any).user;
+
+      let receiptImageUrl = req.body?.receiptImage;
+      if (req.file) {
+        receiptImageUrl = await uploadReceiptImage(req.file, authUser?.uid || "general");
+      }
+
+      if (!receiptImageUrl) {
+        return res.status(400).json({ success: false, message: "Debe proporcionar una imagen o archivo de comprobante" });
+      }
+
+      await this.updateOrderReceiptUseCase.execute(id, receiptImageUrl, authUser?.uid, authUser?.userType);
+
+      res.status(200).json({
+        success: true,
+        message: "Comprobante de pago actualizado correctamente",
+        receiptImage: receiptImageUrl,
+      });
+    } catch (error: any) {
+      const statusCode = error.message?.includes("permiso")
+        ? 403
+        : error.message?.includes("encontrada")
+        ? 404
+        : 500;
+      res.status(statusCode).json({ success: false, message: error.message || "Error al actualizar el comprobante" });
     }
   }
 }

@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Blindar totalmente Firebase Storage contra accesos directos de clientes.
+    // La subida y administración de archivos se realiza exclusivamente desde suplicem-backend.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

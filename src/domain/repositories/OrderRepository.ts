@@ -33,4 +33,5 @@ export interface OrderRepository {
     deliveryType: string,
     deliveries: any[]
   ): Promise<any>;
+  updateReceiptImage(orderId: string, receiptImage: string): Promise<void>;
 }

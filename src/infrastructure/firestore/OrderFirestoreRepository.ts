@@ -466,4 +466,11 @@ export class OrderFirestoreRepository implements OrderRepository {
       };
     });
   }
+
+  async updateReceiptImage(orderId: string, receiptImage: string): Promise<void> {
+    await firestore.collection("orders").doc(orderId).update({
+      receiptImage,
+      updatedAt: new Date().toISOString(),
+    });
+  }
 }
