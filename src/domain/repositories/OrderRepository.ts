@@ -18,7 +18,7 @@ export interface OrderRepository {
     status: "approved" | "rejected",
     reason?: string
   ): Promise<void>;
-  completeDelivery(
+  completeDelivery( 
     orderId: string,
     index: number,
     data: { comment?: string; imageUrl?: string }

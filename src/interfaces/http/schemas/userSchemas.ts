@@ -3,8 +3,14 @@ import { z } from "zod";
 export const AddressSchema = z.object({
   placeId: z.string().optional().default(""),
   description: z.string().min(1, "description es requerida"),
-  latitude: z.coerce.number().optional().default(0),
-  longitude: z.coerce.number().optional().default(0),
+  latitude: z.coerce
+    .number()
+    .optional()
+    .transform((val) => (val === 0 || isNaN(val as number) ? undefined : val)),
+  longitude: z.coerce
+    .number()
+    .optional()
+    .transform((val) => (val === 0 || isNaN(val as number) ? undefined : val)),
   additionalInfo: z.string().optional().default(""),
 });
 

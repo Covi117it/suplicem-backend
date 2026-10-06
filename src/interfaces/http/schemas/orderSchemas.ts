@@ -4,8 +4,14 @@ export const AddressSchema = z.object({
   id: z.string().optional(),
   placeId: z.string().optional(),
   description: z.string().optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  latitude: z.coerce
+    .number()
+    .optional()
+    .transform((val) => (val === 0 || isNaN(val as number) ? undefined : val)),
+  longitude: z.coerce
+    .number()
+    .optional()
+    .transform((val) => (val === 0 || isNaN(val as number) ? undefined : val)),
   additionalInfo: z.string().optional(),
   recipientName: z.string().optional(),
   recipientDocument: z.string().optional(),
@@ -24,7 +30,7 @@ export const CreateOrderSchema = z
           productId: z.string().min(1, "productId es requerido"),
           quantity: z.number().positive("quantity debe ser mayor a 0"),
           unit: z.string().min(1, "unit es requerido"),
-          address: z.any().optional(),
+          address: AddressSchema.optional().nullable(),
         })
       )
       .optional()
