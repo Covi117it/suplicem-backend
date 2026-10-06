@@ -16,6 +16,9 @@ export const uploadDeliveryImage = async (
       contentType: file.mimetype || "image/jpeg",
       metadata: {
         firebaseStorageDownloadTokens: downloadToken,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+        },
       },
     });
 
@@ -42,6 +45,9 @@ export const uploadIdentificationImage = async (
       contentType: file.mimetype || "image/jpeg",
       metadata: {
         firebaseStorageDownloadTokens: downloadToken,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+        },
       },
     });
 
@@ -97,6 +103,9 @@ export const uploadReceiptImage = async (
       contentType: file.mimetype || "image/jpeg",
       metadata: {
         firebaseStorageDownloadTokens: downloadToken,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+        },
       },
     });
 
