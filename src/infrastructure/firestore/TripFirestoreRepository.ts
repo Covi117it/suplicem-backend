@@ -71,7 +71,7 @@ export class TripFirestoreRepository implements TripRepository {
       ...doc.data(),
     })) as Trip[];
 
-    if (driverId) {
+        if (driverId) {
       trips = trips.filter(
         (t: any) =>
           !t.assignedDriverId ||
@@ -79,6 +79,18 @@ export class TripFirestoreRepository implements TripRepository {
           t.assignedDriverId === driverId ||
           (t.driverId && t.driverId === driverId)
       );
+
+      // Priorizar asignados al conductor de primero, y luego los más antiguos primero (FIFO)
+      trips.sort((a: any, b: any) => {
+        const aMine = a.assignedDriverId === driverId || a.driverId === driverId;
+        const bMine = b.assignedDriverId === driverId || b.driverId === driverId;
+        if (aMine && !bMine) return -1;
+        if (!aMine && bMine) return 1;
+        return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      });
+    } else {
+      // Para consultas generales, también ordenar los más antiguos primero (FIFO)
+      trips.sort((a: any, b: any) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
     }
 
     return trips;
