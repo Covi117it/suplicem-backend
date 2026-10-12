@@ -63,7 +63,8 @@ export class CreateOrderUseCase {
 
       const unitPrice = product.price;
       const name = product.name;
-      const unit = product.unit || "fundas";
+      const isCement = name.toLowerCase().includes("cemento");
+      const unit = isCement ? "fundas" : (product.unit || "fundas");
       const subtotal = Number((unitPrice * item.quantity).toFixed(2));
 
       validatedItems.push({
@@ -101,6 +102,27 @@ export class CreateOrderUseCase {
         ? data.deliveries[0].address
         : undefined);
 
+    // Regla Oficial Suplicem:
+    // - Cemento Especial (Blanco / Estructural) = 40.0 kg = 0.040 t (1,000 fundas = 40.00 t)
+    // - Cemento Normal (Gris / Uso General) = 42.5 kg = 0.0425 t (1,000 fundas = 42.50 t)
+    const calculatedTotalTons = validatedItems.reduce((acc, item) => {
+      const count = Number(item.quantity) || 0;
+      const itemName = (item.name || "").toLowerCase();
+      const isCement = item.unit === "fundas" || !item.unit || itemName.includes("cemento");
+      if (!isCement) {
+        return acc + count;
+      }
+      const isSpecial =
+        itemName.includes("blanco") ||
+        itemName.includes("especial") ||
+        itemName.includes("estructural") ||
+        itemName.includes("40kg") ||
+        itemName.includes("40 kg");
+      const factor = isSpecial ? 0.0400 : 0.0425;
+      const tons = Number((count * factor).toFixed(2));
+      return acc + tons;
+    }, 0);
+
     const order: Order = {
       orderNumber,
       userId: data.userId,
@@ -109,6 +131,10 @@ export class CreateOrderUseCase {
       userLastNames,
       userEmail,
       deliveryType: data.deliveryType,
+      deliveryPreference: data.deliveryPreference || "partial",
+      totalTons: calculatedTotalTons,
+      pendingBalance: calculatedTotalTons,
+      deliveredTons: 0,
       deliveryAddress: resolvedDeliveryAddress,
       deliveries: (data.deliveries ?? []).map((d) => ({
         ...d,

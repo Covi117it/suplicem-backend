@@ -28,6 +28,10 @@ export interface Order {
   id?: string;
   userId: string;
   deliveryType: "almacen" | "domicilio";
+  deliveryPreference?: "partial" | "single_trip";
+  totalTons?: number;
+  pendingBalance?: number;
+  deliveredTons?: number;
   deliveryAddress?: Address;
   deliveries: DeliveryDetail[];
   items: OrderItem[];

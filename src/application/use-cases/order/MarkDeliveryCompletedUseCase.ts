@@ -25,13 +25,25 @@ export class MarkDeliveryCompletedUseCase {
     const userId = typeof orderIdOrDto === "object" ? orderIdOrDto.userId : undefined;
     const userRole = typeof orderIdOrDto === "object" ? orderIdOrDto.userRole : undefined;
 
-    // Validación BOLA/IDOR: Si es conductor, debe ser el conductor asignado al viaje de esta orden
+    // Validación BOLA/IDOR: Si es conductor, debe ser el conductor asignado a un viaje activo de esta orden
     if (userRole === "driver" && userId && this.tripRepo) {
-      const trip = await this.tripRepo.getTripByOrderId(orderId);
-      const assignedDriver =
-        trip?.assignedDriverId || (trip as any)?.driverId || trip?.driver?.id || trip?.driver?.uid;
-      if (!trip || assignedDriver !== userId) {
-        throw new Error("No tienes permiso para completar entregas en esta orden porque no eres el conductor asignado.");
+      let isAssigned = false;
+      if (this.tripRepo.getTripsByOrderId) {
+        const trips = await this.tripRepo.getTripsByOrderId(orderId);
+        isAssigned = trips.some((t) => {
+          const driver = t.assignedDriverId || (t as any).driverId || t.driver?.id || t.driver?.uid;
+          const isActive = ["accepted", "started", "in_progress"].includes(t.status);
+          return isActive && driver === userId;
+        });
+      }
+
+      if (!isAssigned) {
+        const trip = await this.tripRepo.getTripByOrderId(orderId);
+        const assignedDriver =
+          trip?.assignedDriverId || (trip as any)?.driverId || trip?.driver?.id || trip?.driver?.uid;
+        if (!trip || assignedDriver !== userId) {
+          throw new Error("No tienes permiso para completar entregas en esta orden porque no eres el conductor asignado.");
+        }
       }
     }
 

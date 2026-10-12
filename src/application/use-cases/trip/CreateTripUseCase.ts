@@ -1,11 +1,13 @@
 import { Trip } from "../../../domain/entities/Trip";
 import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
+import { UserRepository } from "../../../domain/repositories/UserRepository";
 
 export class CreateTripUseCase {
   constructor(
     private tripRepo: TripRepository,
-    private orderRepo: OrderRepository
+    private orderRepo: OrderRepository,
+    private userRepo?: UserRepository
   ) {}
 
   async execute(data: {
@@ -21,6 +23,7 @@ export class CreateTripUseCase {
 
     const uniqueOrderIds = [...new Set(data.orderIds)];
     let calculatedTotalTons = 0;
+    let existingTripsCount = 0;
 
     for (const orderId of uniqueOrderIds) {
       const order = await this.orderRepo.getById(orderId);
@@ -34,52 +37,99 @@ export class CreateTripUseCase {
         );
       }
 
-      // Validar si tiene viaje previo activo (no cancelado)
-      const existingTrip = await this.tripRepo.getTripByOrderId(orderId);
-      if (existingTrip && existingTrip.status !== "canceled") {
-        throw new Error(
-          `La orden #${order.orderNumber || orderId} ya se encuentra asignada al viaje ${existingTrip.tripNumber}.`
-        );
+      // Obtener viajes existentes de la orden
+      let existingTrips: any[] = [];
+      if (this.tripRepo.getTripsByOrderId) {
+        existingTrips = await this.tripRepo.getTripsByOrderId(orderId);
+      } else {
+        const singleTrip = await this.tripRepo.getTripByOrderId(orderId);
+        if (singleTrip && singleTrip.status !== "canceled") {
+          existingTrips = [singleTrip];
+        }
       }
 
-      if (!order.deliveries || order.deliveries.length === 0) {
-        throw new Error(
-          `La orden #${order.orderNumber || orderId} no tiene entregas (deliveries) configuradas.`
-        );
-      }
+      existingTripsCount += existingTrips.length;
 
-      // Tonelaje real: solo sumar entregas que estén PENDIENTES de transporte
-      const pendingDeliveries = order.deliveries.filter(
+      // Tonelaje total de la orden
+      const pendingDeliveries = (order.deliveries || []).filter(
         (del) => del.status !== "delivered" && del.delivered !== true
       );
-
-      const orderPendingTons = pendingDeliveries.reduce(
-        (sum, delivery) => sum + (Number(delivery.quantity) || 0),
+      const deliveriesPendingTons = pendingDeliveries.reduce(
+        (sum, del) => sum + (Number(del.quantity) || 0),
         0
       );
+      const orderTotalTons =
+        Number(order.totalTons) ||
+        Number(order.pendingBalance) ||
+        deliveriesPendingTons ||
+        0;
 
-      if (orderPendingTons <= 0) {
+      if (orderTotalTons <= 0) {
         throw new Error(
           `La orden #${order.orderNumber || orderId} no tiene tonelaje pendiente por transportar.`
         );
       }
 
-      calculatedTotalTons += orderPendingTons;
+      // Calcular tonelaje ya en tránsito o entregado
+      const activeTrips = existingTrips.filter((t) =>
+        ["available", "assigned", "accepted", "started", "in_progress"].includes(t.status || "")
+      );
+      const tonsInTransit = activeTrips.reduce((sum, t) => {
+        const tTons = Number(t.totalTons);
+        return sum + (tTons > 0 ? tTons : orderTotalTons);
+      }, 0);
+      const alreadyDelivered = Number(order.deliveredTons) || 0;
+      const availableToDispatch = Math.max(0, orderTotalTons - alreadyDelivered - tonsInTransit);
+
+      // Si no queda tonelaje disponible y hay un viaje activo, rechazar
+      if (availableToDispatch <= 0) {
+        const conflictTrip = activeTrips[0] || existingTrips[0];
+        throw new Error(
+          `La orden #${order.orderNumber || orderId} ya se encuentra asignada al viaje ${conflictTrip?.tripNumber || "activo"}.`
+        );
+      }
+
+      calculatedTotalTons += availableToDispatch;
     }
 
     if (calculatedTotalTons <= 0) {
       throw new Error("El total de toneladas calculado para el viaje debe ser mayor a 0.");
     }
 
+    // Ajustar si se envió totalTons explícito menor
+    if (data.totalTons && data.totalTons > 0 && data.totalTons < calculatedTotalTons) {
+      calculatedTotalTons = data.totalTons;
+    }
+
+    // Si se asignó un conductor, limitar a la capacidad de su camión si es menor
+    if (data.driverId && this.userRepo) {
+      const driverUser = await this.userRepo.getById(data.driverId);
+      const driverCap = Number(driverUser?.vehicle?.tons) || 0;
+      if (driverCap > 0 && driverCap < calculatedTotalTons) {
+        calculatedTotalTons = driverCap;
+      }
+    }
+
     const isDriverAssigned = Boolean(data.driverId && data.driverId.trim() !== "");
+    const initialStatus = isDriverAssigned ? "assigned" : "available";
+
+    // Mantener nombre limpio sin duplicar sufijos (ej. TRIP-183-2, TRIP-183-3)
+    let finalTripNumber = data.tripNumber;
+    const hasCorrelativeSuffix = /-\d+$/.test(data.tripNumber);
+    if (!hasCorrelativeSuffix && existingTripsCount > 0) {
+      finalTripNumber = `${data.tripNumber}-${existingTripsCount + 1}`;
+    }
+
+    const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
     const newTrip: Trip = {
-      tripNumber: data.tripNumber,
+      tripNumber: finalTripNumber,
       orderIds: uniqueOrderIds,
-      comments: data.comments || "",
-      totalTons: data.totalTons && data.totalTons > 0 ? data.totalTons : calculatedTotalTons,
-      assignedDriverId: isDriverAssigned ? data.driverId : "",
-      status: isDriverAssigned ? "accepted" : "available",
+      comments: data.comments,
+      totalTons: Number(calculatedTotalTons.toFixed(2)),
+      status: initialStatus,
+      assignedDriverId: data.driverId || undefined,
       createdAt: new Date().toISOString(),
+      deliveryPin: generatedPin,
     };
 
     return await this.tripRepo.createTripAtomic(newTrip, uniqueOrderIds);

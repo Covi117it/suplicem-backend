@@ -28,16 +28,7 @@ export class TripFirestoreRepository implements TripRepository {
           throw new Error(`La orden #${orderData?.orderNumber || orderId} no está aprobada.`);
         }
 
-        // Si ya tiene un viaje asociado, verificar si está activo o cancelado
-        if (orderData?.tripId) {
-          const linkedTripRef = firestore.collection("trips").doc(orderData.tripId);
-          const linkedTripSnap = await transaction.get(linkedTripRef);
-          if (linkedTripSnap.exists && linkedTripSnap.data()?.status !== "canceled") {
-            throw new Error(
-              `La orden #${orderData?.orderNumber || orderId} ya se encuentra asignada al viaje ${linkedTripSnap.data()?.tripNumber || orderData.tripId}.`
-            );
-          }
-        }
+        // Nota: La validación de balance y despachos simultáneos vive en CreateTripUseCase
       }
 
       // 2. Crear documento de viaje
@@ -49,7 +40,7 @@ export class TripFirestoreRepository implements TripRepository {
       for (const orderRef of orderRefs) {
         transaction.update(orderRef, {
           tripId: tripRef.id,
-          tripStatus: isDriverAssigned ? "accepted" : "available",
+          tripStatus: isDriverAssigned ? "assigned" : "available",
           assignedDriverId: trip.assignedDriverId || "",
           driverId: trip.assignedDriverId || "",
           updatedAt: new Date().toISOString(),
@@ -63,7 +54,7 @@ export class TripFirestoreRepository implements TripRepository {
   async getAvailable(driverId?: string): Promise<Trip[]> {
     const snapshot = await firestore
       .collection("trips")
-      .where("status", "==", "available")
+      .where("status", "in", ["available", "assigned"])
       .get();
 
     let trips = snapshot.docs.map((doc) => ({
@@ -71,13 +62,11 @@ export class TripFirestoreRepository implements TripRepository {
       ...doc.data(),
     })) as Trip[];
 
-        if (driverId) {
+    if (driverId) {
       trips = trips.filter(
         (t: any) =>
-          !t.assignedDriverId ||
-          t.assignedDriverId === "" ||
-          t.assignedDriverId === driverId ||
-          (t.driverId && t.driverId === driverId)
+          (t.status === "available" && (!t.assignedDriverId || t.assignedDriverId === "" || t.assignedDriverId === driverId || t.driverId === driverId)) ||
+          (t.status === "assigned" && (t.assignedDriverId === driverId || t.driverId === driverId))
       );
 
       // Priorizar asignados al conductor de primero, y luego los más antiguos primero (FIFO)
@@ -152,7 +141,7 @@ export class TripFirestoreRepository implements TripRepository {
       if (!tripDoc.exists) throw new Error("El viaje solicitado no existe");
 
       const tripData = tripDoc.data();
-      if (tripData?.status !== "available") {
+      if (tripData?.status !== "available" && tripData?.status !== "assigned") {
         if (tripData?.status === "accepted" && (tripData?.assignedDriverId === driverId || tripData?.driverId === driverId)) {
           return;
         }
@@ -183,18 +172,24 @@ export class TripFirestoreRepository implements TripRepository {
     });
   }
 
-  async updateTripStatus(tripId: string, status: string): Promise<void> {
+  async updateTripStatus(tripId: string, status: string, cancellationReason?: string): Promise<void> {
     if (status === "completed") {
       await this.completeTrip(tripId);
     } else if (status === "available" || status === "canceled") {
       const tripDoc = await firestore.collection("trips").doc(tripId).get();
       const tripData = tripDoc.data();
 
-      await firestore.collection("trips").doc(tripId).update({
+      const tripUpdate: any = {
         status: status,
         assignedDriverId: "",
         driverId: "",
-      });
+      };
+
+      if (status === "canceled" && cancellationReason) {
+        tripUpdate.cancellationReason = cancellationReason;
+      }
+
+      await firestore.collection("trips").doc(tripId).update(tripUpdate);
 
       const orderIds = tripData?.orderIds || [];
       for (const oId of orderIds) {
@@ -236,25 +231,45 @@ export class TripFirestoreRepository implements TripRepository {
       const orderRefs = orderIds.map((id) => firestore.collection("orders").doc(id));
       const orderSnaps = await Promise.all(orderRefs.map((ref) => transaction.get(ref)));
 
-      for (const orderSnap of orderSnaps) {
-        if (orderSnap.exists) {
-          const deliveries = orderSnap.data()?.deliveries || [];
-          const allDelivered = deliveries.length > 0 && deliveries.every(
-            (del: any) => del.status === "delivered" || del.delivered === true
-          );
-          if (!allDelivered) {
-            throw new Error("No se puede completar el viaje: hay entregas pendientes");
-          }
-        }
-      }
-
+      const tripTons = Number(tripData.totalTons) || 0;
       transaction.update(tripRef, { status: "completed" });
+
       for (const orderSnap of orderSnaps) {
         if (orderSnap.exists) {
-          transaction.update(orderSnap.ref, {
-            status: "completed",
-            tripStatus: "completed",
-          });
+          const orderData = orderSnap.data() as any;
+          const currentDelivered = Number(orderData.deliveredTons) || 0;
+          const orderTotalTons = Number(orderData.totalTons) || (currentDelivered + tripTons);
+          const newDelivered = Number((currentDelivered + tripTons).toFixed(2));
+          const newPendingBalance = Number(Math.max(0, orderTotalTons - newDelivered).toFixed(2));
+
+          const deliveries = (orderData.deliveries || []).map((d: any) => ({ ...d }));
+
+          if (newPendingBalance <= 0) {
+            // Cierre Final Definitivo: toda la orden fue entregada
+            const completedDeliveries = deliveries.map((d: any) => ({
+              ...d,
+              status: "delivered",
+              delivered: true,
+            }));
+
+            transaction.update(orderSnap.ref, {
+              status: "completed",
+              tripStatus: "completed",
+              deliveredTons: orderTotalTons,
+              pendingBalance: 0,
+              deliveries: completedDeliveries,
+              updatedAt: new Date().toISOString(),
+            });
+          } else {
+            // Entrega Fraccionada: se descuenta la fracción, pero la orden sigue activa en estado parcial
+            transaction.update(orderSnap.ref, {
+              status: "approved",
+              tripStatus: "partial_delivered",
+              deliveredTons: newDelivered,
+              pendingBalance: newPendingBalance,
+              updatedAt: new Date().toISOString(),
+            });
+          }
         }
       }
     });
@@ -274,8 +289,20 @@ export class TripFirestoreRepository implements TripRepository {
     status: string;
     assignedDriverId: string;
     driver: any | null;
+    deliveryPin?: string;
   } | null> {
     return await TripQueryService.getTripByOrderId(orderId);
+  }
+
+  async getTripsByOrderId(orderId: string): Promise<Trip[]> {
+    const snapshot = await firestore
+      .collection("trips")
+      .where("orderIds", "array-contains", orderId)
+      .get();
+
+    return snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() } as Trip))
+      .filter((trip) => trip.status !== "canceled");
   }
 
   async getDriverActiveTrip(driverId: string): Promise<Trip | null> {

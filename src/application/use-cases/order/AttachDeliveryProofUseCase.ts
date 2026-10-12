@@ -25,11 +25,23 @@ export class AttachDeliveryProofUseCase {
     }
 
     if (dto.userRole === "driver" && dto.userId && this.tripRepo) {
-      const trip = await this.tripRepo.getTripByOrderId(dto.orderId);
-      const assignedDriver =
-        trip?.assignedDriverId || (trip as any)?.driverId || trip?.driver?.id || trip?.driver?.uid;
-      if (!trip || assignedDriver !== dto.userId) {
-        throw new Error("No tienes permiso para adjuntar comprobantes en esta orden porque no eres el conductor asignado.");
+      let isAssigned = false;
+      if (this.tripRepo.getTripsByOrderId) {
+        const trips = await this.tripRepo.getTripsByOrderId(dto.orderId);
+        isAssigned = trips.some((t) => {
+          const driver = t.assignedDriverId || (t as any).driverId || t.driver?.id || t.driver?.uid;
+          const isActive = ["accepted", "started", "in_progress"].includes(t.status);
+          return isActive && driver === dto.userId;
+        });
+      }
+
+      if (!isAssigned) {
+        const trip = await this.tripRepo.getTripByOrderId(dto.orderId);
+        const assignedDriver =
+          trip?.assignedDriverId || (trip as any)?.driverId || trip?.driver?.id || trip?.driver?.uid;
+        if (!trip || assignedDriver !== dto.userId) {
+          throw new Error("No tienes permiso para adjuntar comprobantes en esta orden porque no eres el conductor asignado.");
+        }
       }
     }
 

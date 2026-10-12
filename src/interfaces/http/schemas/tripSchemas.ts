@@ -11,14 +11,33 @@ export const CreateTripSchema = z.object({
   totalTons: z.number().positive("totalTons debe ser mayor a 0").optional(),
 });
 
-export const UpdateTripStatusSchema = z.object({
-  tripId: z.string().optional(),
-  status: z.enum(
-    ["available", "accepted", "started", "in_progress", "completed", "canceled"],
-    {
-      message: "status no válido",
-    }
-  ),
+const tripStatusEnum = z.enum([
+  "available",
+  "assigned",
+  "accepted",
+  "in_progress",
+  "completed",
+  "canceled",
+  "started",
+], {
+  message: "El estado objetivo debe ser: available, assigned, accepted, in_progress, completed, canceled o started",
 });
+
+export const UpdateTripStatusSchema = z
+  .object({
+    status: tripStatusEnum.optional(),
+    targetStatus: tripStatusEnum.optional(),
+    cancellationReason: z.string().optional(),
+    reason: z.string().optional(),
+    deliveryPin: z.string().optional(),
+  })
+  .refine((data) => Boolean(data.status || data.targetStatus), {
+    message: "Debes enviar 'status' o 'targetStatus'.",
+  })
+  .transform((data) => ({
+    ...data,
+    targetStatus: data.targetStatus || data.status,
+    status: data.status || data.targetStatus,
+  }));
 
 export const AcceptTripSchema = z.object({}).passthrough().optional().default({});

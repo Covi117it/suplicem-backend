@@ -7,10 +7,15 @@ export class UpdateTripStatusUseCase {
     tripId: string,
     targetStatus: string,
     userId?: string,
-    userRole?: string
+    userRole?: string,
+    cancellationReason?: string,
+    deliveryPin?: string
   ): Promise<void> {
     if (!tripId || !targetStatus) {
       throw new Error("ID del viaje o status faltante.");
+    }
+    if (targetStatus === "canceled" && (!cancellationReason || !cancellationReason.trim())) {
+      throw new Error("Se requiere un motivo o comentario para cancelar el viaje.");
     }
     const trip = await this.tripRepo.getById(tripId);
     if (!trip) {
@@ -46,6 +51,7 @@ export class UpdateTripStatusUseCase {
     // 2. Matriz de transiciones permitidas
     const allowedTransitions: Record<string, string[]> = {
       available: ["accepted", "canceled", "started"],
+      assigned: ["accepted", "canceled", "started", "available", "in_progress"],
       accepted: ["started", "in_progress", "available", "canceled"],
       started: ["completed", "canceled", "available", "in_progress"],
       in_progress: ["completed", "canceled", "available", "started"],
@@ -69,7 +75,21 @@ export class UpdateTripStatusUseCase {
       throw new Error("No se puede iniciar el viaje porque no tiene un conductor asignado.");
     }
 
-    // 4. Aplicar la actualización
-    await this.tripRepo.updateTripStatus(tripId, targetStatus);
+    // 4. Regla de seguridad estilo Uber para completar la entrega
+    if (targetStatus === "completed") {
+      // Si quien completa es el conductor, debe proveer obligatoriamente el PIN del cliente
+      if (userRole === "driver") {
+        if (!trip.deliveryPin) {
+          throw new Error("El viaje no cuenta con un código de entrega asignado. Contacta al administrador.");
+        }
+        if (!deliveryPin || deliveryPin.trim() !== trip.deliveryPin.trim()) {
+          throw new Error("Código de entrega inválido. Solicita al cliente el código de 4 dígitos para completar el viaje.");
+        }
+      }
+      // Nota: Si es admin (userRole === 'admin'), se autoriza la finalización directa como mecanismo de contingencia.
+    }
+
+    // 5. Aplicar la actualización
+    await this.tripRepo.updateTripStatus(tripId, targetStatus, cancellationReason);
   }
 }

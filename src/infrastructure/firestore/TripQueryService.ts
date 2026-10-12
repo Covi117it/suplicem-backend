@@ -54,6 +54,7 @@ export class TripQueryService {
         const user = userMap.get(order.userId);
         return {
           ...order,
+          tripTons: tripData.totalTons,
           userNames: user?.names,
           userLastNames: user?.lastNames,
           userType: user?.userType,
@@ -77,6 +78,7 @@ export class TripQueryService {
     status: string;
     assignedDriverId: string;
     driver: any | null;
+    deliveryPin?: string;
   } | null> {
     const tripSnap = await firestore
       .collection("trips")
@@ -85,8 +87,13 @@ export class TripQueryService {
 
     if (tripSnap.empty) return null;
 
-    // Tomar solo el viaje activo que NO esté cancelado
-    const activeDoc = tripSnap.docs.find((d) => d.data().status !== "canceled");
+    // Priorizar viaje activo (en curso o disponible)
+    const activeDoc =
+      tripSnap.docs.find((d) =>
+        ["available", "accepted", "started", "in_progress"].includes(d.data().status)
+      ) ||
+      tripSnap.docs.find((d) => d.data().status !== "canceled");
+
     if (!activeDoc) return null;
 
     const data = activeDoc.data() as Trip;
@@ -96,6 +103,7 @@ export class TripQueryService {
       status: data.status,
       assignedDriverId: data.assignedDriverId || "",
       driver: null,
+      deliveryPin: data.deliveryPin,
     };
   }
 }

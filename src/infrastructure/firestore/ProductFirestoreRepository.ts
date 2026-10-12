@@ -18,6 +18,13 @@ const DEFAULT_PRODUCTS = [
     createdAt: new Date().toISOString(),
   },
   {
+    name: "Funda de Cemento Especial (40kg)",
+    unit: "fundas",
+    price: 680,
+    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    createdAt: new Date().toISOString(),
+  },
+  {
     name: "Varilla de Construcción 3/8\" (Quintal)",
     unit: "quintal",
     price: 3200,

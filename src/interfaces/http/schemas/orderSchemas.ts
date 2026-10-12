@@ -24,6 +24,7 @@ export const CreateOrderSchema = z
     deliveryType: z.enum(["almacen", "domicilio"], {
       message: "deliveryType debe ser 'almacen' o 'domicilio'",
     }),
+    deliveryPreference: z.enum(["partial", "single_trip"]).optional().default("partial"),
     deliveries: z
       .array(
         z.object({

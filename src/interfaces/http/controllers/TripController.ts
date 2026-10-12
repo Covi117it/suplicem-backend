@@ -13,18 +13,20 @@ import { GetDriverActualTripsUseCase } from "../../../application/use-cases/trip
 import { GetTripByOrderIdUseCase } from "../../../application/use-cases/trip/GetTripByOrderIdUseCase";
 import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/GetDriverActiveTripUseCase";
 import { CompleteTripUseCase } from "../../../application/use-cases/trip/CompleteTripUseCase";
+import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
 
 const tripRepo = new TripFirestoreRepository();
 const orderRepo = new OrderFirestoreRepository();
+const userRepo = new UserFirestoreRepository();
 
 export class TripController {
   constructor(
-    private createTripUseCase = new CreateTripUseCase(tripRepo, orderRepo),
-    private getAvailableTripsUseCase = new GetAvailableTripsUseCase(tripRepo),
+    private createTripUseCase = new CreateTripUseCase(tripRepo, orderRepo, userRepo),
+    private getAvailableTripsUseCase = new GetAvailableTripsUseCase(tripRepo, userRepo),
     private getDriverTripHistoryUseCase = new GetDriverTripHistoryUseCase(tripRepo),
     private getDriverActualTripsUseCase = new GetDriverActualTripsUseCase(tripRepo),
     private getAllTripsUseCase = new GetAllTripsUseCase(tripRepo),
-    private acceptTripUseCase = new AcceptTripUseCase(tripRepo),
+    private acceptTripUseCase = new AcceptTripUseCase(tripRepo, userRepo),
     private getTripDetailsUseCase = new GetTripDetailsUseCase(tripRepo),
     private getTripByOrderIdUseCase = new GetTripByOrderIdUseCase(tripRepo),
     private updateTripStatusUseCase = new UpdateTripStatusUseCase(tripRepo),
@@ -131,12 +133,16 @@ export class TripController {
     }
   }
 
-  async getDriverActiveTrip(req: Request, res: Response) {
+    async getDriverActiveTrip(req: Request, res: Response) {
     try {
       const userId = req.user?.uid;
       if (!userId) return res.status(401).json({ success: false, message: "Usuario no autenticado" });
 
       const trip = await this.getDriverActiveTripUseCase.execute(userId);
+      if (trip && trip.deliveryPin) {
+        // Cero Fugas de Datos: jamás enviar el PIN al chofer
+        delete (trip as any).deliveryPin;
+      }
       res.status(200).json({ success: true, hasActiveTrip: Boolean(trip), trip });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || "Error al obtener viaje activo" });
@@ -146,17 +152,19 @@ export class TripController {
   async updateTripStatus(req: Request, res: Response) {
     try {
       const tripId = req.params.id || req.body.tripId;
-      const { status } = req.body;
-      if (!tripId || !status) return res.status(400).json({ success: false, message: "tripId y status son requeridos" });
+      const { status, targetStatus, reason, cancellationReason, deliveryPin } = req.body;
+      const finalStatus = targetStatus || status;
+      const finalReason = cancellationReason || reason;
+      if (!tripId || !finalStatus) return res.status(400).json({ success: false, message: "tripId y status son requeridos" });
       const authUser = (req as any).user;
       const userId = authUser?.uid;
       const userRole = authUser?.userType;
-      if (status === "completed") {
-        await this.completeTripUseCase.execute(tripId, userId, userRole);
+      if (finalStatus === "completed") {
+        await this.completeTripUseCase.execute(tripId, userId, userRole, deliveryPin);
       } else {
-        await this.updateTripStatusUseCase.execute(tripId, status, userId, userRole);
+        await this.updateTripStatusUseCase.execute(tripId, finalStatus, userId, userRole, finalReason, deliveryPin);
       }
-      res.status(200).json({ success: true, message: `Status actualizado correctamente a ${status}` });
+      res.status(200).json({ success: true, message: `Status actualizado correctamente a ${finalStatus}` });
     } catch (error: any) {
       const status = error.message?.includes("permiso") ? 403 : error.message?.includes("encontrado") ? 404 : 400;
       res.status(status).json({ success: false, message: error.message || "Error al actualizar status" });

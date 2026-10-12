@@ -29,10 +29,10 @@ export class OrderController {
   constructor(
     private createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo, idempotencyRepo, userRepo),
     private getMyOrdersUseCase = new GetMyOrdersUseCase(orderRepo, userRepo),
-    private getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo),
+    private getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo, userRepo),
     private getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo),
     private getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo),
-    private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo),
+    private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo, userRepo),
     private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo, tripRepo),
     private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo, tripRepo),
     private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo),
