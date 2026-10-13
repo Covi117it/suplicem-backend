@@ -17,7 +17,7 @@ export class TripQueryService {
       throw new Error("Viaje no encontrado");
     }
 
-    const tripData = tripSnap.data() as Trip;
+    const tripData = { id: tripSnap.id, ...tripSnap.data() } as Trip;
     let driverData: any = null;
 
     if (tripData.assignedDriverId) {
@@ -52,8 +52,52 @@ export class TripQueryService {
 
       orders = orders.map((order) => {
         const user = userMap.get(order.userId);
+
+        // 1. Numerar cada entrega con su originalIndex de Firestore
+        const allDeliveriesWithIndex = (order.deliveries || []).map((d: any, idx: number) => ({
+          ...d,
+          originalIndex: idx,
+        }));
+
+        // 2. Filtrar entregas asignadas a este viaje específico
+        let tripDeliveries = allDeliveriesWithIndex.filter(
+          (d: any) => Boolean(d.tripId) && d.tripId === tripData.id
+        );
+
+        // Retrocompatibilidad con órdenes viejas sin tripId asignado:
+        if (tripDeliveries.length === 0 && allDeliveriesWithIndex.length > 0) {
+          let assignedTons = 0;
+          const targetTripTons = Number(tripData.totalTons) || 0;
+
+          tripDeliveries = allDeliveriesWithIndex.filter((del: any) => {
+            const factor = 0.0425;
+            const tons = del.unit === "fundas" ? Number((del.quantity * factor).toFixed(2)) : Number(del.quantity);
+            if (assignedTons + tons <= targetTripTons + 0.5 || assignedTons === 0) {
+              assignedTons += tons;
+              return true;
+            }
+            return false;
+          });
+        }
+
+        // 3. Filtrar items de la orden para reflejar solo lo que va en este camión
+        const tripProductIds = new Set(tripDeliveries.map((d: any) => d.productId));
+        const tripItems = (order.items || [])
+          .filter((item: any) => tripProductIds.has(item.productId))
+          .map((item: any) => {
+            const productDeliveries = tripDeliveries.filter((d: any) => d.productId === item.productId);
+            const tripQty = productDeliveries.reduce((sum: number, d: any) => sum + (Number(d.quantity) || 0), 0);
+            return {
+              ...item,
+              quantity: tripQty > 0 ? tripQty : item.quantity,
+              subtotal: tripQty > 0 ? tripQty * (Number(item.unitPrice) || 0) : item.subtotal,
+            };
+          });
+
         return {
           ...order,
+          deliveries: tripDeliveries,
+          items: tripItems.length > 0 ? tripItems : order.items,
           tripTons: tripData.totalTons,
           userNames: user?.names,
           userLastNames: user?.lastNames,

@@ -53,7 +53,7 @@ export class UpdateOrderStatusUseCase {
             const tripNumber = `TRIP-${order.orderNumber || orderId.slice(0, 6).toUpperCase()}`;
             const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
-            await this.tripRepo.create({
+            const tripPayload = {
               tripNumber,
               orderIds: [orderId],
               comments: order.comments || "Entrega generada automáticamente por aprobación",
@@ -62,7 +62,13 @@ export class UpdateOrderStatusUseCase {
               assignedDriverId: driverId || "",
               createdAt: new Date().toISOString(),
               deliveryPin: generatedPin,
-            });
+            };
+
+            if (this.tripRepo.createTripAtomic) {
+              await this.tripRepo.createTripAtomic(tripPayload, [orderId]);
+            } else {
+              await this.tripRepo.create(tripPayload);
+            }
           }
         }
       } catch (tripError) {

@@ -35,14 +35,38 @@ export class TripFirestoreRepository implements TripRepository {
       const tripRef = firestore.collection("trips").doc();
       transaction.set(tripRef, { ...trip, id: tripRef.id });
 
-      // 3. Vincular atómicamente cada orden de inmediato
+      // 3. Vincular atómicamente cada orden y sus entregas correspondientes
       const isDriverAssigned = Boolean(trip.assignedDriverId);
-      for (const orderRef of orderRefs) {
-        transaction.update(orderRef, {
+      const targetTripTons = Number(trip.totalTons) || 0;
+
+      for (let i = 0; i < orderSnaps.length; i++) {
+        const orderSnap = orderSnaps[i];
+        const orderData = orderSnap.data() as any;
+        const deliveries = (orderData?.deliveries || []).map((d: any) => ({ ...d }));
+
+        // Asignar tripId a las entregas pendientes que quepan en la capacidad de este viaje
+        let assignedTons = 0;
+        for (const del of deliveries) {
+          if (!del.tripId && del.status !== "delivered") {
+            const qty = Number(del.quantity) || 0;
+            const dName = (del.productName || del.name || "").toLowerCase();
+            const isSpecial = dName.includes("blanco") || dName.includes("especial") || dName.includes("estructural") || dName.includes("40kg") || dName.includes("40 kg");
+            const factor = isSpecial ? 0.0400 : 0.0425;
+            const delTons = del.unit === "fundas" ? Number((qty * factor).toFixed(2)) : qty;
+
+            if (assignedTons + delTons <= targetTripTons + 0.5 || assignedTons === 0) {
+              del.tripId = tripRef.id;
+              assignedTons += delTons;
+            }
+          }
+        }
+
+        transaction.update(orderSnap.ref, {
           tripId: tripRef.id,
           tripStatus: isDriverAssigned ? "assigned" : "available",
           assignedDriverId: trip.assignedDriverId || "",
           driverId: trip.assignedDriverId || "",
+          deliveries,
           updatedAt: new Date().toISOString(),
         });
       }

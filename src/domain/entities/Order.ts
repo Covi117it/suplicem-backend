@@ -2,6 +2,7 @@ import { Address } from "./User";
 
 export interface DeliveryDetail {
   id?: string;
+  tripId?: string;
   productId: string;
   address?: Address;
   quantity: number;
@@ -12,6 +13,7 @@ export interface DeliveryDetail {
   images?: string[];
   comment?: string;
   productName?: string;
+  originalIndex?: number;
 }
 
 export interface OrderItem {
