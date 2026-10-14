@@ -28,8 +28,9 @@ Thumbs.db
 
 # Credentials & Service Keys
 keys.json
+keys*.json
 src/config/keys.json
-!.env.example
+src/config/keys*.json
 !keys.json.example
 
 # Temp / Scratch scripts
