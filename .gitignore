@@ -36,6 +36,7 @@ src/config/keys*.json
 
 # Temp / Scratch scripts
 get_users.js
+scripts/
 
 # AI Agent memory & rules
 GEMINI.md
