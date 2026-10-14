@@ -146,16 +146,28 @@ export class CreateUserUseCase {
       // 3. Guardar en Firestore
       await this.userRepo.create(userToSave);
 
-      // 4. Despachar correos en segundo plano de forma no bloqueante
-      Promise.all([
-        this.authService
-          .login(email, password)
-          .then(({ idToken: token }) => this.authService.sendVerificationEmail(token))
-          .catch((err) => console.warn("Aviso Firebase Verification Email:", err?.message)),
-        this.botService
-          .sendWelcomeEmailBot(email, names, lastNames, userType, identification)
-          .catch((err) => console.warn("Aviso Welcome Bot Email:", err?.message)),
-      ]).catch((err) => console.warn("Error en tareas secundarias:", err?.message));
+      // 4. Despachar correo de bienvenida con botón de verificación en segundo plano
+      this.authService
+        .generateEmailVerificationLink(email)
+        .then((verificationLink: string) =>
+          this.botService.sendWelcomeEmailBot(
+            email,
+            names,
+            lastNames,
+            userType,
+            identification,
+            verificationLink
+          )
+        )
+        .catch((err: any) => {
+          console.warn(
+            "Aviso al generar enlace de verificación, enviando bienvenida básica:",
+            err?.message
+          );
+          this.botService
+            .sendWelcomeEmailBot(email, names, lastNames, userType, identification)
+            .catch((e: any) => console.warn("Aviso Welcome Bot Email:", e?.message));
+        });
 
       return {
         user: userToSave,

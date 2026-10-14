@@ -23,6 +23,7 @@ export interface AuthService {
   sendVerificationEmail(idToken: string): Promise<void>;
   sendPasswordResetEmail(email: string): Promise<void>;
   getUserByUid(uid: string): Promise<{ emailVerified: boolean }>;
+  generateEmailVerificationLink(email: string): Promise<string>;
   sendPushNotification(token: string, title: string, body: string): Promise<void>;
   deleteUser(uid: string): Promise<void>;
 }

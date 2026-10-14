@@ -41,3 +41,19 @@ export const UpdateTripStatusSchema = z
   }));
 
 export const AcceptTripSchema = z.object({}).passthrough().optional().default({});
+
+export const AssignTripDriverSchema = z.object({
+  driverId: z.string().min(1, "El ID del conductor es obligatorio"),
+});
+
+export const SplitOrderTripsSchema = z.object({
+  trips: z
+    .array(
+      z.object({
+        totalTons: z.number().positive("totalTons debe ser mayor a 0"),
+        driverId: z.string().optional(),
+        comments: z.string().optional(),
+      })
+    )
+    .min(1, "Debe incluir al menos un viaje"),
+});

@@ -41,11 +41,17 @@ export class RegistrationBotService {
           },
         });
 
+        const plainText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
         const info = await transporter.sendMail({
-          from: `"Suplicem Bot" <${process.env.SMTP_USER}>`,
+          from: `"Suplicem" <${process.env.SMTP_USER}>`,
+          replyTo: process.env.SMTP_USER,
           to,
           subject,
+          text: plainText,
           html,
+          headers: {
+            "X-Entity-Ref-ID": `${Date.now()}-${to}`,
+          },
         });
         console.log(`✅ [Bot de Correo] Enviado mediante SMTP a ${to}. ID: ${info.messageId}`);
         return;
@@ -93,7 +99,8 @@ export class RegistrationBotService {
     names: string,
     lastNames: string,
     userType: string,
-    identification: string
+    identification: string,
+    verificationLink?: string
   ): Promise<void> {
     const roleLabel =
       userType === "client"
@@ -106,7 +113,22 @@ export class RegistrationBotService {
       `🤖 [Bot de Correo Suplicem] Procesando envío automático de bienvenida para el perfil: ${email}`
     );
 
-    const emailSubject = "🤖 ¡Bienvenido a Suplicem! Registro completado con éxito";
+    const verificationButtonHtml = verificationLink
+      ? `
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${verificationLink}" style="background-color: #E31E24; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">
+              Verificar mi Correo
+            </a>
+          </div>
+
+          <p style="font-size: 13px; color: #64748B; line-height: 1.5; text-align: center;">
+            Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:<br />
+            <a href="${verificationLink}" style="color: #0284C7; word-break: break-all;">${verificationLink}</a>
+          </p>
+        `
+      : "";
+
+    const emailSubject = "¡Bienvenido a Suplicem! Registro completado con éxito";
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
         <div style="background-color: #0F294A; padding: 18px; text-align: center; border-radius: 6px 6px 0 0;">
@@ -130,12 +152,14 @@ export class RegistrationBotService {
             </ul>
           </div>
 
+          ${verificationButtonHtml}
+
           <p style="font-size: 14px; line-height: 1.5;">
             Tu solicitud de cuenta se encuentra en revisión por el Administrador. Tan pronto tu documento sea verificado, recibirás una notificación de activación.
           </p>
 
           <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8;">
-            <p>🤖 Este es un mensaje automático generado por el Bot de Registro de Suplicem.</p>
+            <p>Este es un mensaje automático generado por Suplicem Dominicana.</p>
             <p>© ${new Date().getFullYear()} Suplicem Dominicana. Todos los derechos reservados.</p>
           </div>
         </div>

@@ -120,7 +120,8 @@ export class FirebaseAuthService implements AuthService {
   }
 
   async generateEmailVerificationLink(email: string): Promise<string> {
-    return await auth.generateEmailVerificationLink(email);
+    const link = await auth.generateEmailVerificationLink(email);
+    return link.includes("lang=") ? link : `${link}&lang=es`;
   }
 
   async sendPushNotification(token: string, title: string, body: string): Promise<void>  {

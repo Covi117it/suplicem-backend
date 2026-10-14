@@ -74,7 +74,17 @@ export const UpdateOrderStatusSchema = z.object({
   }),
   reason: z.string().optional(),
   driverId: z.string().optional(),
+  tripsPlan: z
+    .array(
+      z.object({
+        totalTons: z.number().positive("totalTons debe ser mayor a 0"),
+        driverId: z.string().optional(),
+        comments: z.string().optional(),
+      })
+    )
+    .optional(),
 });
+
 
 export const UpdateOrderDeliveriesSchema = z.object({
   deliveryType: z.enum(["almacen", "domicilio"], {

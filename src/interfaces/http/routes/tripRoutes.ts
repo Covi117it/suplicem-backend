@@ -7,7 +7,10 @@ import {
   CreateTripSchema,
   UpdateTripStatusSchema,
   AcceptTripSchema,
+  AssignTripDriverSchema,
+  SplitOrderTripsSchema,
 } from "../schemas/tripSchemas";
+
 
 export const tripRoutes = (router: Router) => {
   const tripController = new TripController();
@@ -52,6 +55,29 @@ export const tripRoutes = (router: Router) => {
       await tripController.updateTripStatus(req, res);
     }
   );
+
+  // 2.1 Asignar conductor a un viaje existente (Solo Administradores)
+  router.patch(
+    "/trips/:id/assign",
+    authenticate,
+    requireRole(["admin"]),
+    validate(AssignTripDriverSchema),
+    async (req, res) => {
+      await tripController.assignDriver(req, res);
+    }
+  );
+
+  // 2.2 Planificar y fraccionar viajes de una orden (Solo Administradores)
+  router.post(
+    "/trips/order/:orderId/split-plan",
+    authenticate,
+    requireRole(["admin"]),
+    validate(SplitOrderTripsSchema),
+    async (req, res) => {
+      await tripController.splitOrderTrips(req, res);
+    }
+  );
+
 
   // 3. Ver todos los viajes (Solo Administradores)
   router.get(

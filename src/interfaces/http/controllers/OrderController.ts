@@ -142,13 +142,14 @@ export class OrderController {
   async updateStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { status, reason, driverId } = req.body;
-      await this.updateOrderStatusUseCase.execute(id, status, reason, driverId);
+      const { status, reason, driverId, tripsPlan } = req.body;
+      await this.updateOrderStatusUseCase.execute(id, status, reason, driverId, tripsPlan);
       res.status(200).json({ success: true, message: "Orden actualizada correctamente" });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || "Error al actualizar la orden" });
     }
   }
+
 
   async completeDelivery(req: Request, res: Response) {
     try {

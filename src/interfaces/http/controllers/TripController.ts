@@ -13,6 +13,8 @@ import { GetDriverActualTripsUseCase } from "../../../application/use-cases/trip
 import { GetTripByOrderIdUseCase } from "../../../application/use-cases/trip/GetTripByOrderIdUseCase";
 import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/GetDriverActiveTripUseCase";
 import { CompleteTripUseCase } from "../../../application/use-cases/trip/CompleteTripUseCase";
+import { AssignTripDriverUseCase } from "../../../application/use-cases/trip/AssignTripDriverUseCase";
+import { SplitOrderTripsUseCase } from "../../../application/use-cases/trip/SplitOrderTripsUseCase";
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
 
 const tripRepo = new TripFirestoreRepository();
@@ -32,8 +34,11 @@ export class TripController {
     private updateTripStatusUseCase = new UpdateTripStatusUseCase(tripRepo),
     private completeTripUseCase = new CompleteTripUseCase(tripRepo),
     private getTripByIdUseCase = new GetTripByIdUseCase(tripRepo),
-    private getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo)
+    private getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo),
+    private assignTripDriverUseCase = new AssignTripDriverUseCase(tripRepo, userRepo),
+    private splitOrderTripsUseCase = new SplitOrderTripsUseCase(tripRepo, orderRepo, userRepo)
   ) {}
+
 
   async create(req: Request, res: Response) {
     try {
@@ -170,4 +175,34 @@ export class TripController {
       res.status(status).json({ success: false, message: error.message || "Error al actualizar status" });
     }
   }
+
+  async assignDriver(req: Request, res: Response) {
+    try {
+      const tripId = req.params.id;
+      const { driverId } = req.body;
+      await this.assignTripDriverUseCase.execute(tripId, driverId);
+      res.status(200).json({ success: true, message: "Conductor asignado al viaje correctamente" });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message || "Error al asignar conductor al viaje" });
+    }
+  }
+
+  async splitOrderTrips(req: Request, res: Response) {
+    try {
+      const orderId = req.params.orderId || req.params.id;
+      const { trips } = req.body;
+      const createdTripIds = await this.splitOrderTripsUseCase.execute(orderId, trips);
+      res.status(200).json({
+        success: true,
+        message: "Viajes fraccionados y planificados correctamente",
+        tripIds: createdTripIds,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Error al planificar los viajes de la orden",
+      });
+    }
+  }
 }
+
