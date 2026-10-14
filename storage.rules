@@ -4,7 +4,8 @@ service firebase.storage {
     // Blindar totalmente Firebase Storage contra accesos directos de clientes.
     // La subida y administración de archivos se realiza exclusivamente desde suplicem-backend.
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

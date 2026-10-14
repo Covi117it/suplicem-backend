@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "node --require ts-node/register --test \"test/**/*.test.ts\"",
-    "emulator:storage": "firebase emulators:start --only storage"
+    "emulator:storage": "firebase emulators:start --only storage --import=./.emulator-data --export-on-exit=./.emulator-data"
   },
   "keywords": [],
   "author": "",
