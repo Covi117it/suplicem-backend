@@ -1,6 +1,17 @@
 import { v4 as uuid } from "uuid";
 import { storage } from "../../config/firebase";
 
+const getStorageFileUrl = (bucketName: string, filePath: string, downloadToken?: string): string => {
+  if (process.env.FIREBASE_STORAGE_EMULATOR_HOST) {
+    const host = process.env.API_URL ? new URL(process.env.API_URL).hostname : "127.0.0.1";
+    const port = process.env.FIREBASE_STORAGE_EMULATOR_HOST.split(":")[1] || "9199";
+    const tokenQuery = downloadToken ? `&token=${downloadToken}` : "";
+    return `http://${host}:${port}/v0/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media${tokenQuery}`;
+  }
+  const tokenQuery = downloadToken ? `&token=${downloadToken}` : "";
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media${tokenQuery}`;
+};
+
 export const uploadDeliveryImage = async (
   file: Express.Multer.File,
   orderId: string,
@@ -22,7 +33,7 @@ export const uploadDeliveryImage = async (
       },
     });
 
-    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${downloadToken}`;
+    return getStorageFileUrl(bucket.name, fileName, downloadToken);
   } catch (error: any) {
     console.error("Error en Firebase Storage uploadDeliveryImage:", error);
     throw new Error("No se pudo almacenar la evidencia fotográfica de la entrega en Storage.");
@@ -51,7 +62,7 @@ export const uploadIdentificationImage = async (
       },
     });
 
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${downloadToken}`;
+    const url = getStorageFileUrl(bucket.name, filePath, downloadToken);
     return { url, filePath };
   } catch (error: any) {
     console.error("Error en Firebase Storage uploadIdentificationImage:", error);
@@ -72,6 +83,9 @@ export const deleteStorageFile = async (filePathOrUrl: string): Promise<void> =>
         filePath = filePath.replace(gcsPrefix, "").split("?")[0];
       } else if (filePath.startsWith(fbPrefix)) {
         const rawPath = filePath.replace(fbPrefix, "").split("?")[0];
+        filePath = decodeURIComponent(rawPath);
+      } else if (filePath.includes(`/v0/b/${bucket.name}/o/`)) {
+        const rawPath = filePath.split(`/v0/b/${bucket.name}/o/`)[1].split("?")[0];
         filePath = decodeURIComponent(rawPath);
       } else {
         return;
@@ -109,7 +123,7 @@ export const uploadReceiptImage = async (
       },
     });
 
-    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${downloadToken}`;
+    return getStorageFileUrl(bucket.name, fileName, downloadToken);
   } catch (error: any) {
     console.error("Error en Firebase Storage uploadReceiptImage:", error);
     throw new Error("No se pudo almacenar el comprobante de pago en Storage.");
@@ -133,6 +147,10 @@ export const uploadProductImage = async (
         firebaseStorageDownloadTokens: downloadToken,
       },
     });
+
+    if (process.env.FIREBASE_STORAGE_EMULATOR_HOST) {
+      return getStorageFileUrl(bucket.name, fileName, downloadToken);
+    }
     return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
   } catch (error: any) {
     console.warn("Advertencia en Firebase Storage uploadProductImage:", error?.message || error);
