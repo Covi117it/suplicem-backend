@@ -14,7 +14,7 @@ const botService = new RegistrationBotService();
 
 export class AuthController {
   constructor(
-    private loginUseCase = new LoginUseCase(authService),
+    private loginUseCase = new LoginUseCase(authService, userRepo),
     private refreshTokenUseCase = new RefreshTokenUseCase(authService),
     private recoverPasswordUseCase = new RecoverPasswordUseCase(authService),
     private getCurrentUserUseCase = new GetCurrentUserUseCase(userRepo),
@@ -30,7 +30,7 @@ export class AuthController {
     } catch (error: any) {
       console.error("Error en login:", error?.response?.data || error.message);
       const rawMessage = error.response?.data?.error?.message;
-      let message = "Error al iniciar sesión";
+      let message = error.message || "Error al iniciar sesión";
       if (rawMessage === "INVALID_LOGIN_CREDENTIALS" || rawMessage === "INVALID_PASSWORD" || rawMessage === "EMAIL_NOT_FOUND") {
         message = "Correo o contraseña incorrectos";
       } else if (rawMessage === "USER_DISABLED") {
@@ -40,8 +40,11 @@ export class AuthController {
       } else if (rawMessage) {
         message = rawMessage;
       }
-      res.status(400).json({
+
+      const isInactive = error.message?.includes("inactiva o suspendida");
+      res.status(isInactive ? 403 : 400).json({
         success: false,
+        code: isInactive ? "ACCOUNT_INACTIVE" : undefined,
         message,
       });
     }

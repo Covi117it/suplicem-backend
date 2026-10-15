@@ -49,12 +49,24 @@ export const authenticate = async (
     const rawUserType = userData?.userType || "client";
     const normalizedUserType = String(rawUserType).trim().toLowerCase();
 
+    const userStatus = userData?.status || "pending";
+    const isAuthMe = req.path === "/auth/me" || (req.originalUrl && req.originalUrl.includes("/auth/me"));
+
+    if (!isAuthMe && (userStatus === "inactive" || userStatus === "banned")) {
+      res.status(403).json({
+        success: false,
+        code: "ACCOUNT_INACTIVE",
+        message: "Acceso denegado: su cuenta se encuentra inactiva o suspendida",
+      });
+      return;
+    }
+
     (req as any).user = {
       ...decodedToken,
       uid: decodedToken.uid,
       email: decodedToken.email,
       userType: normalizedUserType,
-      status: userData?.status || "pending",
+      status: userStatus,
     } as AuthenticatedUser;
 
     next();

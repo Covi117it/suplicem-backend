@@ -154,4 +154,12 @@ export class FirebaseAuthService implements AuthService {
       console.warn("Advertencia al eliminar usuario de Auth:", error?.message);
     }
   }
+
+  async markEmailAsVerified(uid: string): Promise<void> {
+    try {
+      await auth.updateUser(uid, { emailVerified: true });
+    } catch (error: any) {
+      console.warn("Advertencia al marcar email como verificado en Auth:", error?.message);
+    }
+  }
 }

@@ -7,7 +7,11 @@ export class UpdateUserStatusUseCase {
 
   constructor(private userRepo: UserRepository) {}
 
-  async execute({ uid, status }: UpdateUserStatusDto): Promise<void> {
+  async execute({ uid, status }: UpdateUserStatusDto, requesterUid?: string): Promise<void> {
+    if (requesterUid && requesterUid === uid && (status === "inactive" || status === "banned")) {
+      throw new Error("No puedes desactivar o suspender tu propia cuenta de administrador");
+    }
+
     const user = await this.userRepo.getById(uid);
 
     if (!user) {
@@ -18,8 +22,8 @@ export class UpdateUserStatusUseCase {
     user.status = status;
     await this.userRepo.update(uid, user);
 
-    // Si el administrador aprueba la cuenta (estado cambia a 'active'), enviar correo con el bot
-    if (status === "active" && previousStatus !== "active") {
+    // Si el administrador aprueba una cuenta nueva por primera vez (estado cambia de 'pending' a 'active'), enviar correo con el bot
+    if (status === "active" && previousStatus === "pending") {
       await this.botService.sendAccountApprovedEmailBot(
         user.email,
         user.names || "Usuario",

@@ -26,4 +26,5 @@ export interface AuthService {
   generateEmailVerificationLink(email: string): Promise<string>;
   sendPushNotification(token: string, title: string, body: string): Promise<void>;
   deleteUser(uid: string): Promise<void>;
+  markEmailAsVerified?(uid: string): Promise<void>;
 }

@@ -69,8 +69,8 @@ export const CreateOrderSchema = z
   });
 
 export const UpdateOrderStatusSchema = z.object({
-  status: z.enum(["approved", "rejected"], {
-    message: "status debe ser 'approved' o 'rejected'",
+  status: z.enum(["approved", "rejected", "completed"], {
+    message: "status debe ser 'approved', 'rejected' o 'completed'",
   }),
   reason: z.string().optional(),
   driverId: z.string().optional(),

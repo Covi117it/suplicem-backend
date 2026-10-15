@@ -11,13 +11,25 @@ export class UpdateOrderStatusUseCase {
 
   async execute(
     orderId: string,
-    status: "approved" | "rejected",
+    status: "approved" | "rejected" | "completed",
     reason?: string,
     driverId?: string,
     tripsPlan?: Array<{ totalTons: number; driverId?: string; comments?: string }>
   ): Promise<void> {
     if (status === "rejected" && !reason) {
       throw new Error("Se requiere un motivo para rechazar la orden");
+    }
+
+    if (status === "completed") {
+      const order = await this.orderRepo.getById(orderId);
+      if (!order) {
+        throw new Error("Orden no encontrada");
+      }
+      if (order.status === "rejected" || order.status === "canceled") {
+        throw new Error("No se puede completar una orden cancelada o rechazada");
+      }
+      await this.orderRepo.updateStatus(orderId, "completed");
+      return;
     }
 
     await this.orderRepo.updateStatus(orderId, status, reason);
@@ -62,16 +74,27 @@ export class UpdateOrderStatusUseCase {
                     const qty = Number(d.quantity) || 0;
                     const dName = (d.productName || (d as any).name || "").toLowerCase();
                     const isSpecial = dName.includes("blanco") || dName.includes("especial") || dName.includes("estructural") || dName.includes("40kg") || dName.includes("40 kg");
-                    const factor = isSpecial ? 0.0400 : 0.0425;
-                    return sum + (d.unit === "fundas" ? Number((qty * factor).toFixed(2)) : qty);
+                    let f = 0.0425;
+                    if (d.weightKg && d.weightKg > 0) f = d.weightKg / 1000;
+                    else if (d.unit === "metro_cubico" || dName.includes("metro")) f = 1.4;
+                    else if (d.unit === "quintal" || dName.includes("quintal")) f = 0.04536;
+                    else if (d.unit === "tonelada" || d.unit === "toneladas") f = 1.0;
+                    else if (isSpecial) f = 0.0400;
+                    else if (d.unit === "fundas" || dName.includes("arena")) f = 0.0400;
+                    return sum + Number((qty * f).toFixed(2));
                   }, 0) ||
                   (order.items || []).reduce((sum, item) => {
                     const qty = Number(item.quantity) || 0;
-                    const isCement = item.unit === "fundas" || item.name?.toLowerCase().includes("cemento");
                     const iName = (item.name || "").toLowerCase();
                     const isSpecial = iName.includes("blanco") || iName.includes("especial") || iName.includes("estructural") || iName.includes("40kg") || iName.includes("40 kg");
-                    const factor = isSpecial ? 0.0400 : 0.0425;
-                    return sum + (isCement ? Number((qty * factor).toFixed(2)) : qty);
+                    let f = 0.0425;
+                    if (item.weightKg && item.weightKg > 0) f = item.weightKg / 1000;
+                    else if (item.unit === "metro_cubico" || iName.includes("metro")) f = 1.4;
+                    else if (item.unit === "quintal" || iName.includes("quintal")) f = 0.04536;
+                    else if (item.unit === "tonelada" || item.unit === "toneladas") f = 1.0;
+                    else if (isSpecial) f = 0.0400;
+                    else if (item.unit === "fundas" || iName.includes("arena")) f = 0.0400;
+                    return sum + Number((qty * f).toFixed(2));
                   }, 0) ||
                   1;
 

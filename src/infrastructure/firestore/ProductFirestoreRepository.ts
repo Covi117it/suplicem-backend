@@ -6,6 +6,7 @@ const DEFAULT_PRODUCTS = [
   {
     name: "Funda de Cemento Gris Titan (42.5kg)",
     unit: "fundas",
+    weightKg: 42.5,
     price: 510,
     imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
     createdAt: new Date().toISOString(),
@@ -13,6 +14,7 @@ const DEFAULT_PRODUCTS = [
   {
     name: "Funda de Cemento Cibao (42.5kg)",
     unit: "fundas",
+    weightKg: 42.5,
     price: 500,
     imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
     createdAt: new Date().toISOString(),
@@ -20,6 +22,7 @@ const DEFAULT_PRODUCTS = [
   {
     name: "Funda de Cemento Especial (40kg)",
     unit: "fundas",
+    weightKg: 40.0,
     price: 680,
     imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
     createdAt: new Date().toISOString(),
@@ -27,6 +30,7 @@ const DEFAULT_PRODUCTS = [
   {
     name: "Varilla de Construcción 3/8\" (Quintal)",
     unit: "quintal",
+    weightKg: 45.36,
     price: 3200,
     imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
     createdAt: new Date().toISOString(),
@@ -34,6 +38,7 @@ const DEFAULT_PRODUCTS = [
   {
     name: "Arena Lavada para Construcción (Metro Cúbico)",
     unit: "metro_cubico",
+    weightKg: 1400.0,
     price: 1100,
     imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
     createdAt: new Date().toISOString(),
@@ -41,6 +46,7 @@ const DEFAULT_PRODUCTS = [
   {
     name: "Gravilla de Construcción 3/4\" (Metro Cúbico)",
     unit: "metro_cubico",
+    weightKg: 1500.0,
     price: 1300,
     imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
     createdAt: new Date().toISOString(),

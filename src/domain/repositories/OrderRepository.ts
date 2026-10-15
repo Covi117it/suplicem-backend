@@ -15,7 +15,7 @@ export interface OrderRepository {
   getNextOrderNumber(): Promise<number>;
   updateStatus(
     orderId: string,
-    status: "approved" | "rejected",
+    status: "approved" | "rejected" | "completed",
     reason?: string
   ): Promise<void>;
   completeDelivery( 

@@ -48,11 +48,13 @@ export class UserController {
   async updateStatus(req: Request, res: Response) {
     try {
       const { uid, status } = req.body;
-      await updateUserStatusUseCase.execute({ uid, status });
-      res.status(200).json({ message: "Estado actualizado correctamente" });
+      const requester = (req as any).user;
+      await updateUserStatusUseCase.execute({ uid, status }, requester?.uid);
+      res.status(200).json({ success: true, message: "Estado actualizado correctamente" });
     } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: error.message });
+      const isForbidden = error.message?.includes("No puedes desactivar");
+      res.status(isForbidden ? 403 : 400).json({ success: false, message: error.message });
     }
   }
 

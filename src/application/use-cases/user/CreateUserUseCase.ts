@@ -78,6 +78,11 @@ export class CreateUserUseCase {
     );
     const { uid, idToken, refreshToken, expiresIn } = authResult as any;
 
+    // Si la cuenta la creó un Administrador autorizado, marcar emailVerified: true inmediatamente
+    if (isAuthorizedAdmin && this.authService.markEmailAsVerified) {
+      await this.authService.markEmailAsVerified(uid);
+    }
+
     let uploadedStorageFilePath: string | null = null;
     let identificationImageUrl: string | null = null;
 
@@ -146,28 +151,34 @@ export class CreateUserUseCase {
       // 3. Guardar en Firestore
       await this.userRepo.create(userToSave);
 
-      // 4. Despachar correo de bienvenida con botón de verificación en segundo plano
-      this.authService
-        .generateEmailVerificationLink(email)
-        .then((verificationLink: string) =>
-          this.botService.sendWelcomeEmailBot(
-            email,
-            names,
-            lastNames,
-            userType,
-            identification,
-            verificationLink
+      // 4. Despachar correo de bienvenida en segundo plano
+      if (isAuthorizedAdmin) {
+        this.botService
+          .sendAdminCreatedAccountEmailBot(email, names, lastNames, userType, identification)
+          .catch((e: any) => console.warn("Aviso Admin Welcome Bot Email:", e?.message));
+      } else {
+        this.authService
+          .generateEmailVerificationLink(email)
+          .then((verificationLink: string) =>
+            this.botService.sendWelcomeEmailBot(
+              email,
+              names,
+              lastNames,
+              userType,
+              identification,
+              verificationLink
+            )
           )
-        )
-        .catch((err: any) => {
-          console.warn(
-            "Aviso al generar enlace de verificación, enviando bienvenida básica:",
-            err?.message
-          );
-          this.botService
-            .sendWelcomeEmailBot(email, names, lastNames, userType, identification)
-            .catch((e: any) => console.warn("Aviso Welcome Bot Email:", e?.message));
-        });
+          .catch((err: any) => {
+            console.warn(
+              "Aviso al generar enlace de verificación, enviando bienvenida básica:",
+              err?.message
+            );
+            this.botService
+              .sendWelcomeEmailBot(email, names, lastNames, userType, identification)
+              .catch((e: any) => console.warn("Aviso Welcome Bot Email:", e?.message));
+          });
+      }
 
       return {
         user: userToSave,

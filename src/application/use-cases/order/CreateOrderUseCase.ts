@@ -74,6 +74,7 @@ export class CreateOrderUseCase {
         quantity: item.quantity,
         unitPrice,
         subtotal,
+        weightKg: product.weightKg,
       });
     }
 
@@ -103,23 +104,39 @@ export class CreateOrderUseCase {
         : undefined);
 
     // Regla Oficial Suplicem:
-    // - Cemento Especial (Blanco / Estructural) = 40.0 kg = 0.040 t (1,000 fundas = 40.00 t)
-    // - Cemento Normal (Gris / Uso General) = 42.5 kg = 0.0425 t (1,000 fundas = 42.50 t)
+    // Cada producto calcula sus toneladas basándose en su peso real (weightKg) o factor oficial:
+    // - 1 funda de Cemento Gris = 42.5 kg (0.0425 t)
+    // - 1 funda de Cemento Blanco / Especial = 40.0 kg (0.040 t)
+    // - 1 funda de Arena = 40.0 kg (0.040 t)
+    // - 1 m³ de agregado/arena = 1.40 t
+    // - 1 quintal de varilla = 45.36 kg (0.04536 t)
     const calculatedTotalTons = validatedItems.reduce((acc, item) => {
       const count = Number(item.quantity) || 0;
       const itemName = (item.name || "").toLowerCase();
       const isCement = item.unit === "fundas" || !item.unit || itemName.includes("cemento");
-      if (!isCement) {
-        return acc + count;
+
+      let factorInTons = 0.0425;
+      if (item.weightKg && item.weightKg > 0) {
+        factorInTons = item.weightKg / 1000;
+      } else if (item.unit === "metro_cubico" || itemName.includes("metro")) {
+        factorInTons = 1.4;
+      } else if (item.unit === "quintal" || itemName.includes("quintal")) {
+        factorInTons = 0.04536;
+      } else if (item.unit === "tonelada" || item.unit === "toneladas") {
+        factorInTons = 1.0;
+      } else if (isCement) {
+        const isSpecial =
+          itemName.includes("blanco") ||
+          itemName.includes("especial") ||
+          itemName.includes("estructural") ||
+          itemName.includes("40kg") ||
+          itemName.includes("40 kg");
+        factorInTons = isSpecial ? 0.0400 : 0.0425;
+      } else if (item.unit === "fundas" || itemName.includes("arena")) {
+        factorInTons = 0.0400;
       }
-      const isSpecial =
-        itemName.includes("blanco") ||
-        itemName.includes("especial") ||
-        itemName.includes("estructural") ||
-        itemName.includes("40kg") ||
-        itemName.includes("40 kg");
-      const factor = isSpecial ? 0.0400 : 0.0425;
-      const tons = Number((count * factor).toFixed(2));
+
+      const tons = Number((count * factorInTons).toFixed(2));
       return acc + tons;
     }, 0);
 

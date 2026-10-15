@@ -192,15 +192,36 @@ export class OrderFirestoreRepository implements OrderRepository {
 
   async updateStatus(
     orderId: string,
-    status: "approved" | "rejected",
+    status: "approved" | "rejected" | "completed",
     reason?: string
   ): Promise<void> {
-    const updateData: Partial<Order> = {
+    const updateData: Record<string, any> = {
       status,
+      updatedAt: new Date().toISOString(),
     };
 
     if (status === "rejected" && reason) {
       updateData.rejectionReason = reason;
+    }
+
+    if (status === "completed") {
+      updateData.completedAt = new Date().toISOString();
+      updateData.pendingBalance = 0;
+
+      const doc = await firestore.collection("orders").doc(orderId).get();
+      if (doc.exists) {
+        const d = doc.data();
+        if (d?.totalTons) {
+          updateData.deliveredTons = d.totalTons;
+        }
+        if (d?.deliveries && Array.isArray(d.deliveries)) {
+          updateData.deliveries = d.deliveries.map((item: any) => ({
+            ...item,
+            status: "delivered",
+            delivered: true,
+          }));
+        }
+      }
     }
 
     await firestore.collection("orders").doc(orderId).update(updateData);

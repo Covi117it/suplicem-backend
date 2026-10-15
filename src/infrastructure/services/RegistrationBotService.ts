@@ -256,4 +256,68 @@ export class RegistrationBotService {
 
     await this.dispatchEmail(email, emailSubject, emailHtml);
   }
+
+  /**
+   * Bot que despacha correo de bienvenida para cuentas creadas directamente por el Administrador.
+   * La cuenta ya nace activa y verificada, sin requerir enlaces de verificación ni revisiones.
+   */
+  async sendAdminCreatedAccountEmailBot(
+    email: string,
+    names: string,
+    lastNames: string,
+    userType: string,
+    identification: string
+  ): Promise<void> {
+    const roleLabel =
+      userType === "client"
+        ? "Cliente"
+        : userType === "driver"
+        ? "Conductor"
+        : "Administrador";
+
+    console.log(
+      `🤖 [Bot de Correo Suplicem] Enviando bienvenida de cuenta creada por Admin para: ${email}`
+    );
+
+    const emailSubject = "🎉 ¡Bienvenido a Suplicem! Tu cuenta ha sido creada";
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        <div style="background-color: #0F294A; padding: 18px; text-align: center; border-radius: 6px 6px 0 0;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">SUPLICEM</h1>
+          <p style="color: #4ADE80; margin: 4px 0 0 0; font-weight: bold; font-size: 13px;">✔ Cuenta Habilitada y Verificada</p>
+        </div>
+
+        <div style="padding: 24px; color: #334155;">
+          <h2 style="color: #0F294A; margin-top: 0;">¡Hola, ${names} ${lastNames}!</h2>
+          <p style="font-size: 15px; line-height: 1.6;">
+            Un administrador de <strong>Suplicem</strong> ha creado y habilitado tu cuenta en nuestra plataforma.
+          </p>
+
+          <div style="background-color: #f8fafc; padding: 16px; border-left: 4px solid #0F294A; margin: 20px 0; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #0F294A; font-size: 16px;">📌 Datos de tu Cuenta:</h3>
+            <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
+              <li><strong>Nombre completo:</strong> ${names} ${lastNames}</li>
+              <li><strong>Correo de acceso:</strong> ${email}</li>
+              <li><strong>Rol asignado:</strong> ${roleLabel}</li>
+              <li><strong>Identificación:</strong> ${identification}</li>
+            </ul>
+          </div>
+
+          <div style="background-color: #f0fdf4; padding: 16px; border-left: 4px solid #22c55e; margin: 20px 0; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #15803d; font-size: 16px;">🚀 ¡Tu cuenta ya está lista para usarse!</h3>
+            <p style="margin: 0; font-size: 14px; color: #166534; line-height: 1.6;">
+              Tu correo y documentos ya se encuentran verificados. Ya puedes abrir la aplicación móvil de Suplicem e iniciar sesión directamente con tu correo electrónico y tu contraseña asignada.
+            </p>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8;">
+            <p>🤖 Este es un mensaje automático generado por Suplicem Dominicana.</p>
+            <p>© ${new Date().getFullYear()} Suplicem Dominicana. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await this.dispatchEmail(email, emailSubject, emailHtml);
+  }
 }

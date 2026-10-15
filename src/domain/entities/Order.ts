@@ -14,6 +14,7 @@ export interface DeliveryDetail {
   comment?: string;
   productName?: string;
   originalIndex?: number;
+  weightKg?: number;
 }
 
 export interface OrderItem {
@@ -23,6 +24,7 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  weightKg?: number;
 }
 
 export interface Order {
@@ -42,7 +44,9 @@ export interface Order {
   creditNote?: string;
   comments?: string;
   receiptImage?: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "completed" | "canceled";
+  completedAt?: string;
+  tripStatus?: string;
   rejectionReason?: string;
   createdAt: string;
   tripId?: string;

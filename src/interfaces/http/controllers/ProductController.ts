@@ -25,15 +25,16 @@ export class ProductController {
 
     async create(req: Request, res: Response) {
     try {
-      let { name, unit, price, imageUrl } = req.body;
+      let { name, unit, price, imageUrl, weightKg } = req.body;
       if (req.file) {
         imageUrl = await uploadProductImage(req.file);
       }
       const id = await this.createProductUseCase.execute({
         name,
         unit,
-        price,
+        price: Number(price),
         imageUrl,
+        weightKg: weightKg !== undefined ? Number(weightKg) : undefined,
       });
 
       res.status(201).json({
@@ -86,13 +87,14 @@ export class ProductController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { name, unit, price, imageUrl } = req.body;
+      const { name, unit, price, imageUrl, weightKg } = req.body;
 
       await this.updateProductUseCase.execute(id, {
         name,
         unit,
         price: price !== undefined ? Number(price) : undefined,
         imageUrl,
+        weightKg: weightKg !== undefined ? Number(weightKg) : undefined,
       });
 
       res.status(200).json({
