@@ -169,6 +169,41 @@ export class TripFirestoreRepository implements TripRepository {
         if (tripData?.status === "accepted" && (tripData?.assignedDriverId === driverId || tripData?.driverId === driverId)) {
           return;
         }
+        throw new Error(`El viaje ${tripData?.tripNumber || tripId} no está disponible para asignación (estado: ${tripData?.status}).`);
+      }
+
+      transaction.update(tripRef, {
+        status: "assigned",
+        assignedDriverId: driverId,
+        driverId: driverId,
+        assignedAt: new Date().toISOString(),
+      });
+
+      const orderIds = tripData?.orderIds || [];
+      for (const oId of orderIds) {
+        const orderRef = firestore.collection("orders").doc(oId);
+        transaction.update(orderRef, {
+          assignedDriverId: driverId,
+          driverId: driverId,
+          tripId: tripId,
+          tripStatus: "assigned",
+        });
+      }
+    });
+  }
+
+  async acceptTrip(tripId: string, driverId: string): Promise<void> {
+    const tripRef = firestore.collection("trips").doc(tripId);
+
+    await firestore.runTransaction(async (transaction) => {
+      const tripDoc = await transaction.get(tripRef);
+      if (!tripDoc.exists) throw new Error("El viaje solicitado no existe");
+
+      const tripData = tripDoc.data();
+      if (tripData?.status !== "available" && tripData?.status !== "assigned") {
+        if (tripData?.status === "accepted" && (tripData?.assignedDriverId === driverId || tripData?.driverId === driverId)) {
+          return;
+        }
         throw new Error(`El viaje ${tripData?.tripNumber || tripId} ya fue tomado por otro conductor.`);
       }
 
@@ -195,6 +230,7 @@ export class TripFirestoreRepository implements TripRepository {
       }
     });
   }
+
 
   async updateTripStatus(tripId: string, status: string, cancellationReason?: string): Promise<void> {
     if (status === "completed") {

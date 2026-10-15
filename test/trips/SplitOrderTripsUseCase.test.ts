@@ -35,7 +35,9 @@ describe("SplitOrderTripsUseCase - Planificación y fraccionamiento de viajes", 
       getDriverTripHistory: async () => [],
       getDriverActualTrips: async () => [],
       assignDriver: async () => {},
+      acceptTrip: async () => {},
       completeTrip: async () => {},
+
       getByIdWithOrders: async () => ({} as any),
       getTripByOrderId: async () => null,
     } as any;

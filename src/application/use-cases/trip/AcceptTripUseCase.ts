@@ -59,8 +59,9 @@ export class AcceptTripUseCase {
       }
     }
 
-    await this.tripRepo.assignDriver(tripId, driverId);
+    await this.tripRepo.acceptTrip(tripId, driverId);
     return { alreadyAccepted: false };
+
   }
 }
 
