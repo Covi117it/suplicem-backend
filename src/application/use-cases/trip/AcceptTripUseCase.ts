@@ -44,18 +44,31 @@ export class AcceptTripUseCase {
       throw err;
     }
 
-    // Validación de Capacidad del Vehículo (Evita sobrecarga)
+    // Validación de Capacidad Acumulada del Vehículo (Evita sobrecarga considerando viajes activos)
     if (this.userRepo) {
       const driver = await this.userRepo.getById(driverId);
       const driverCapacity = Number(driver?.vehicle?.tons) || 0;
       const tripTons = Number(trip.totalTons) || 0;
 
-      if (driverCapacity > 0 && tripTons > driverCapacity) {
-        const err: any = new Error(
-          `La carga del viaje (${tripTons} t) supera la capacidad máxima de tu camión (${driverCapacity} t).`
+      if (driverCapacity > 0) {
+        const activeTrips = await this.tripRepo.getDriverActualTrips(driverId);
+        // Excluir este mismo viaje en caso de reintento
+        const otherTrips = activeTrips.filter((t) => t.id !== tripId);
+        const currentCommittedTons = otherTrips.reduce(
+          (sum, t) => sum + (Number(t.totalTons) || 0),
+          0
         );
-        err.statusCode = 400;
-        throw err;
+        const totalTonsWithNewTrip = currentCommittedTons + tripTons;
+
+        if (totalTonsWithNewTrip > driverCapacity) {
+          const err: any = new Error(
+            currentCommittedTons > 0
+              ? `No puedes aceptar este viaje (${tripTons} t). Ya tienes asignadas ${currentCommittedTons.toFixed(2)} t y la suma (${totalTonsWithNewTrip.toFixed(2)} t) supera la capacidad máxima de tu camión (${driverCapacity} t).`
+              : `La carga del viaje (${tripTons} t) supera la capacidad máxima de tu camión (${driverCapacity} t).`
+          );
+          err.statusCode = 400;
+          throw err;
+        }
       }
     }
 

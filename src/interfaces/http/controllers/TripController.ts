@@ -15,6 +15,7 @@ import { GetDriverActiveTripUseCase } from "../../../application/use-cases/trip/
 import { CompleteTripUseCase } from "../../../application/use-cases/trip/CompleteTripUseCase";
 import { AssignTripDriverUseCase } from "../../../application/use-cases/trip/AssignTripDriverUseCase";
 import { SplitOrderTripsUseCase } from "../../../application/use-cases/trip/SplitOrderTripsUseCase";
+import { SplitSingleTripUseCase } from "../../../application/use-cases/trip/SplitSingleTripUseCase";
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
 
 const tripRepo = new TripFirestoreRepository();
@@ -36,7 +37,8 @@ export class TripController {
     private getTripByIdUseCase = new GetTripByIdUseCase(tripRepo),
     private getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo),
     private assignTripDriverUseCase = new AssignTripDriverUseCase(tripRepo, userRepo),
-    private splitOrderTripsUseCase = new SplitOrderTripsUseCase(tripRepo, orderRepo, userRepo)
+    private splitOrderTripsUseCase = new SplitOrderTripsUseCase(tripRepo, orderRepo, userRepo),
+    private splitSingleTripUseCase = new SplitSingleTripUseCase(tripRepo, orderRepo)
   ) {}
 
 
@@ -201,6 +203,24 @@ export class TripController {
       res.status(400).json({
         success: false,
         message: error.message || "Error al planificar los viajes de la orden",
+      });
+    }
+  }
+
+  async splitSingleTrip(req: Request, res: Response) {
+    try {
+      const tripId = req.params.id;
+      const { trips } = req.body;
+      const createdTripIds = await this.splitSingleTripUseCase.execute(tripId, trips);
+      res.status(200).json({
+        success: true,
+        message: "Viaje fraccionado correctamente",
+        tripIds: createdTripIds,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Error al fraccionar el viaje",
       });
     }
   }

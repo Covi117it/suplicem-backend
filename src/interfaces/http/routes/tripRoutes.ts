@@ -78,6 +78,17 @@ export const tripRoutes = (router: Router) => {
     }
   );
 
+  // 2.3 Fraccionar un viaje individual específico (Solo Administradores)
+  router.post(
+    "/trips/:id/split",
+    authenticate,
+    requireRole(["admin"]),
+    validate(SplitOrderTripsSchema),
+    async (req, res) => {
+      await tripController.splitSingleTrip(req, res);
+    }
+  );
+
 
   // 3. Ver todos los viajes (Solo Administradores)
   router.get(

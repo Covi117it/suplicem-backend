@@ -11,7 +11,11 @@ export class GetDriverActiveTripUseCase {
       return null;
     }
 
-    const activeTrip = trips[0];
+    // Priorizar el viaje que ya esté iniciado o en progreso físico
+    const runningTrip = trips.find(
+      (t) => t.status === "started" || t.status === "in_progress"
+    );
+    const activeTrip = runningTrip || trips[0];
     if (!activeTrip.id) {
       return null;
     }

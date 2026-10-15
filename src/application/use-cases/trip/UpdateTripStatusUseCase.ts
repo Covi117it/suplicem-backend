@@ -71,8 +71,25 @@ export class UpdateTripStatusUseCase {
       trip.driver?.id ||
       trip.driver?.uid;
 
-    if ((targetStatus === "started" || targetStatus === "in_progress") && !assignedDriver) {
-      throw new Error("No se puede iniciar el viaje porque no tiene un conductor asignado.");
+    if (targetStatus === "started" || targetStatus === "in_progress") {
+      if (!assignedDriver) {
+        throw new Error("No se puede iniciar el viaje porque no tiene un conductor asignado.");
+      }
+
+      // Regla de concurrencia: El conductor no puede tener más de un viaje en curso al mismo tiempo
+      const driverTrips = await this.tripRepo.getDriverActualTrips(assignedDriver);
+      const activeRunningTrip = driverTrips.find(
+        (t) =>
+          t.id !== tripId &&
+          (t.status === "started" || t.status === "in_progress")
+      );
+
+      if (activeRunningTrip) {
+        const tripNum = activeRunningTrip.tripNumber || activeRunningTrip.id;
+        throw new Error(
+          `Ya tienes el viaje #${tripNum} en curso. Debes completarlo o cancelarlo antes de iniciar otro.`
+        );
+      }
     }
 
     // 4. Regla de seguridad estilo Uber para completar la entrega
