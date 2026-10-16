@@ -44,8 +44,11 @@ export class CreateUserUseCase {
     const names = (parsedData?.names || parsedData?.data?.names || "").toString().trim();
     const lastNames = (parsedData?.lastNames || parsedData?.data?.lastNames || "").toString().trim();
     const requestedUserType = parsedData?.userType || parsedData?.data?.userType || "client";
-    const identification = (parsedData?.identification || parsedData?.data?.identification || "").toString().trim();
     const identificationType = parsedData?.identificationType || parsedData?.data?.identificationType || "Cedula";
+    const rawIdentification = (parsedData?.identification || parsedData?.data?.identification || "").toString().trim();
+    const identification = identificationType === "Cedula"
+      ? rawIdentification.replace(/[^0-9]/g, "")
+      : rawIdentification;
     const phone = (parsedData?.phone || parsedData?.data?.phone || "").toString().trim();
     // 🔒 Control estricto de escalada de privilegios
     const isAuthorizedAdmin = requester?.userType === "admin" && requester?.status === "active";
