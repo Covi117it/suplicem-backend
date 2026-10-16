@@ -27,4 +27,6 @@ export interface AuthService {
   sendPushNotification(token: string, title: string, body: string): Promise<void>;
   deleteUser(uid: string): Promise<void>;
   markEmailAsVerified?(uid: string): Promise<void>;
+  setUserDisabled?(uid: string, disabled: boolean): Promise<void>;
+  revokeRefreshTokens?(uid: string): Promise<void>;
 }

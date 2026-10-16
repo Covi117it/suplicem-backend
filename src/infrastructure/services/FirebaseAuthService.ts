@@ -162,4 +162,20 @@ export class FirebaseAuthService implements AuthService {
       console.warn("Advertencia al marcar email como verificado en Auth:", error?.message);
     }
   }
+
+  async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
+    try {
+      await auth.updateUser(uid, { disabled });
+    } catch (error: any) {
+      console.warn(`Advertencia al actualizar disabled en Auth para ${uid}:`, error?.message);
+    }
+  }
+
+  async revokeRefreshTokens(uid: string): Promise<void> {
+    try {
+      await auth.revokeRefreshTokens(uid);
+    } catch (error: any) {
+      console.warn(`Advertencia al revocar tokens en Auth para ${uid}:`, error?.message);
+    }
+  }
 }

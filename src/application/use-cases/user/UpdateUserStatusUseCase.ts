@@ -1,11 +1,15 @@
 import { UserRepository } from "../../../domain/repositories/UserRepository";
+import { AuthService } from "../../../domain/services/AuthService";
 import { RegistrationBotService } from "../../../infrastructure/services/RegistrationBotService";
 import { UpdateUserStatusDto } from "../../dtos/UserDtos";
 
 export class UpdateUserStatusUseCase {
   private botService = new RegistrationBotService();
 
-  constructor(private userRepo: UserRepository) {}
+  constructor(
+    private userRepo: UserRepository,
+    private authService?: AuthService
+  ) {}
 
   async execute({ uid, status }: UpdateUserStatusDto, requesterUid?: string): Promise<void> {
     if (requesterUid && requesterUid === uid && (status === "inactive" || status === "banned")) {
@@ -21,6 +25,14 @@ export class UpdateUserStatusUseCase {
     const previousStatus = user.status;
     user.status = status;
     await this.userRepo.update(uid, user);
+
+    // Sincronizar estado en Firebase Auth y revocar sesiones activas
+    if (status === "inactive" || status === "banned") {
+      await this.authService?.setUserDisabled?.(uid, true);
+      await this.authService?.revokeRefreshTokens?.(uid);
+    } else if (status === "active") {
+      await this.authService?.setUserDisabled?.(uid, false);
+    }
 
     // Si el administrador aprueba una cuenta nueva por primera vez (estado cambia de 'pending' a 'active'), enviar correo con el bot
     if (status === "active" && previousStatus === "pending") {

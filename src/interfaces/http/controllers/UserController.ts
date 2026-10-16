@@ -13,7 +13,7 @@ const authService = new FirebaseAuthService();
 const createUserUseCase = new CreateUserUseCase(userRepo, authService);
 const getAllUsersUseCase = new GetAllUsersUseCase(userRepo);
 const getUserByIdUseCase = new GetUserByIdUseCase(userRepo);
-const updateUserStatusUseCase = new UpdateUserStatusUseCase(userRepo);
+const updateUserStatusUseCase = new UpdateUserStatusUseCase(userRepo, authService);
 const updateUserUseCase = new UpdateUserUseCase(userRepo);
 
 export class UserController {
