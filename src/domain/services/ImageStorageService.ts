@@ -142,16 +142,15 @@ export const uploadProductImage = async (
 
     await fileRef.save(file.buffer, {
       contentType: file.mimetype || "image/jpeg",
-      public: true, // El catálogo de productos sí puede ser de lectura pública
       metadata: {
         firebaseStorageDownloadTokens: downloadToken,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+        },
       },
     });
 
-    if (process.env.FIREBASE_STORAGE_EMULATOR_HOST) {
-      return getStorageFileUrl(bucket.name, fileName, downloadToken);
-    }
-    return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    return getStorageFileUrl(bucket.name, fileName, downloadToken);
   } catch (error: any) {
     console.warn("Advertencia en Firebase Storage uploadProductImage:", error?.message || error);
     throw error;

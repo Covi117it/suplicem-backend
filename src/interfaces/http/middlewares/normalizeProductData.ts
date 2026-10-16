@@ -13,5 +13,12 @@ export const normalizeProductData = (req: Request, _res: Response, next: NextFun
     }
   }
 
+  if (typeof req.body.weightKg === "string") {
+    const parsedWeight = parseFloat(req.body.weightKg);
+    if (!isNaN(parsedWeight)) {
+      req.body.weightKg = parsedWeight;
+    }
+  }
+
   next();
 };
