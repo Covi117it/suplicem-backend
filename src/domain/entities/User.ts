@@ -12,7 +12,6 @@ export interface User {
   identification: string;
   identificationImage?: string;
   email: string;
-  password?: string;
   names: string;
   lastNames: string;
   phone: string;
