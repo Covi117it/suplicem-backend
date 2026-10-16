@@ -9,6 +9,9 @@ import { errorHandler } from "./interfaces/http/middlewares/errorHandler";
 export const startServer = () => {
   const app = express();
 
+  // Confiar en el proxy inverso (Nginx en AWS Lightsail)
+  app.set("trust proxy", 1);
+
   app.use(cors());
 
   // Logging middleware
