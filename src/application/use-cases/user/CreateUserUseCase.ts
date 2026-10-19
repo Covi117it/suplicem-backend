@@ -150,6 +150,9 @@ export class CreateUserUseCase {
       if (parsedVehicle) {
         userToSave.vehicle = parsedVehicle;
       }
+      if (userType === "driver") {
+        userToSave.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
+      }
 
       // 3. Guardar en Firestore
       await this.userRepo.create(userToSave);
