@@ -21,4 +21,26 @@ export const validate = (schema: ZodSchema) => {
       next(error);
     }
   };
-};   
+};
+
+export const validateParams = (schema: ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      (req as any).validatedParams = schema.parse(req.params ?? {});
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          success: false,
+          message: "Error de validación en los parámetros de la ruta",
+          errors: error.issues.map((err: ZodIssue) => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+        return;
+      }
+      next(error);
+    }
+  };
+};

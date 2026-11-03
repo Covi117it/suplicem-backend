@@ -7,6 +7,7 @@ import { orderRoutes } from "./orderRoutes";
 import { tripRoutes } from "./tripRoutes";
 import { locationRoutes } from "./locationRoutes";
 import { configRoutes } from "./configRoutes";
+import { companyRoutes } from "./companyRoutes";
 
 export const registerRoutes = (): Router => {
   const router = Router();
@@ -19,6 +20,7 @@ export const registerRoutes = (): Router => {
   tripRoutes(router);
   locationRoutes(router);
   configRoutes(router);
+  companyRoutes(router);
 
   return router;
 };

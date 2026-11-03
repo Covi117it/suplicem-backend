@@ -97,6 +97,7 @@ test("Aceptación de múltiples viajes por capacidad y restricción de inicio ú
     },
     create: async () => {},
     update: async () => {},
+    getByPhone: async () => null,
     getAll: async () => [],
   };
 

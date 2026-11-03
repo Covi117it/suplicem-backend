@@ -24,11 +24,11 @@ export const tripRoutes = (router: Router) => {
     }
   );
 
-  // 1. Crear viaje (Solo Administradores)
+  // 1. Crear viaje (Administradores y vendedores)
   router.post(
     "/trips",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     validate(CreateTripSchema),
     async (req, res) => {
       await tripController.create(req, res);
@@ -60,7 +60,7 @@ export const tripRoutes = (router: Router) => {
   router.patch(
     "/trips/:id/assign",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     validate(AssignTripDriverSchema),
     async (req, res) => {
       await tripController.assignDriver(req, res);
@@ -71,7 +71,7 @@ export const tripRoutes = (router: Router) => {
   router.post(
     "/trips/order/:orderId/split-plan",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     validate(SplitOrderTripsSchema),
     async (req, res) => {
       await tripController.splitOrderTrips(req, res);
@@ -82,7 +82,7 @@ export const tripRoutes = (router: Router) => {
   router.post(
     "/trips/:id/split",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     validate(SplitOrderTripsSchema),
     async (req, res) => {
       await tripController.splitSingleTrip(req, res);
@@ -90,11 +90,11 @@ export const tripRoutes = (router: Router) => {
   );
 
 
-  // 3. Ver todos los viajes (Solo Administradores)
+  // 3. Ver todos los viajes (Administradores y vendedores)
   router.get(
     "/trips",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     async (req, res) => {
       await tripController.getAll(req, res);
     }

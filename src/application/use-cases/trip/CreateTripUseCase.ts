@@ -2,6 +2,7 @@ import { Trip } from "../../../domain/entities/Trip";
 import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
+import { selectBestDriver } from "../../../domain/services/DriverAssignmentService";
 
 export class CreateTripUseCase {
   constructor(
@@ -101,16 +102,27 @@ export class CreateTripUseCase {
       calculatedTotalTons = data.totalTons;
     }
 
+    // Asignación directa automática: si no se indicó conductor, se elige el mejor
+    // candidato activo con capacidad disponible para la carga calculada.
+    let resolvedDriverId = (data.driverId || "").trim();
+    if (!resolvedDriverId && this.userRepo) {
+      const [drivers, allTrips] = await Promise.all([
+        this.userRepo.getAll({ status: "active", userType: "driver" }),
+        this.tripRepo.getAll(),
+      ]);
+      resolvedDriverId = selectBestDriver(drivers, allTrips, calculatedTotalTons) || "";
+    }
+
     // Si se asignó un conductor, limitar a la capacidad de su camión si es menor
-    if (data.driverId && this.userRepo) {
-      const driverUser = await this.userRepo.getById(data.driverId);
+    if (resolvedDriverId && this.userRepo) {
+      const driverUser = await this.userRepo.getById(resolvedDriverId);
       const driverCap = Number(driverUser?.vehicle?.tons) || 0;
       if (driverCap > 0 && driverCap < calculatedTotalTons) {
         calculatedTotalTons = driverCap;
       }
     }
 
-    const isDriverAssigned = Boolean(data.driverId && data.driverId.trim() !== "");
+    const isDriverAssigned = resolvedDriverId !== "";
     const initialStatus = isDriverAssigned ? "assigned" : "available";
 
     // Mantener nombre limpio sin duplicar sufijos (ej. TRIP-183-2, TRIP-183-3)
@@ -127,7 +139,7 @@ export class CreateTripUseCase {
       comments: data.comments,
       totalTons: Number(calculatedTotalTons.toFixed(2)),
       status: initialStatus,
-      assignedDriverId: data.driverId || undefined,
+      assignedDriverId: resolvedDriverId || undefined,
       createdAt: new Date().toISOString(),
       deliveryPin: generatedPin,
     };

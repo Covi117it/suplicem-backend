@@ -1,6 +1,7 @@
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
+import { selectBestDriver } from "../../../domain/services/DriverAssignmentService";
 
 export class UpdateOrderStatusUseCase {
   constructor(
@@ -9,6 +10,22 @@ export class UpdateOrderStatusUseCase {
     private userRepo?: UserRepository
   ) {}
 
+  private async resolveDriverId(
+    requiredTons: number,
+    preferredDriverId?: string
+  ): Promise<string> {
+    const preferred = (preferredDriverId || "").trim();
+    if (preferred) return preferred;
+    if (!this.userRepo || !this.tripRepo) return "";
+
+    const [drivers, trips] = await Promise.all([
+      this.userRepo.getAll({ status: "active", userType: "driver" }),
+      this.tripRepo.getAll(),
+    ]);
+
+    return selectBestDriver(drivers, trips, requiredTons) || "";
+  }
+
   async execute(
     orderId: string,
     status: "approved" | "rejected" | "completed",
@@ -16,8 +33,8 @@ export class UpdateOrderStatusUseCase {
     driverId?: string,
     tripsPlan?: Array<{ totalTons: number; driverId?: string; comments?: string }>
   ): Promise<void> {
-    if (status === "rejected" && !reason) {
-      throw new Error("Se requiere un motivo para rechazar la orden");
+    if (status === "rejected" && (!reason || reason.trim().length < 5)) {
+      throw new Error("El motivo de rechazo debe tener al menos 5 caracteres");
     }
 
     if (status === "completed") {
@@ -46,7 +63,10 @@ export class UpdateOrderStatusUseCase {
               for (let i = 0; i < tripsPlan.length; i++) {
                 const plan = tripsPlan[i];
                 const tripNumber = tripsPlan.length > 1 ? `${baseTripNumber}-${i + 1}` : baseTripNumber;
-                const tripDriver = plan.driverId || driverId || "";
+                const tripDriver = await this.resolveDriverId(
+                  plan.totalTons,
+                  plan.driverId || driverId
+                );
                 const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
                 const tripPayload = {
@@ -106,6 +126,7 @@ export class UpdateOrderStatusUseCase {
                 }
               }
 
+              const resolvedDriverId = await this.resolveDriverId(tripTons, driverId);
               const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
               const tripPayload = {
@@ -113,8 +134,8 @@ export class UpdateOrderStatusUseCase {
                 orderIds: [orderId],
                 comments: order.comments || "Entrega generada automáticamente por aprobación",
                 totalTons: tripTons,
-                status: driverId ? "assigned" : "available",
-                assignedDriverId: driverId || "",
+                status: resolvedDriverId ? "assigned" : "available",
+                assignedDriverId: resolvedDriverId,
                 createdAt: new Date().toISOString(),
                 deliveryPin: generatedPin,
               };

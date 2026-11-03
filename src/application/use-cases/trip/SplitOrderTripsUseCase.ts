@@ -2,6 +2,7 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { Trip } from "../../../domain/entities/Trip";
+import { selectBestDriver } from "../../../domain/services/DriverAssignmentService";
 
 export class SplitOrderTripsUseCase {
   constructor(
@@ -9,6 +10,22 @@ export class SplitOrderTripsUseCase {
     private orderRepo: OrderRepository,
     private userRepo?: UserRepository
   ) {}
+
+  private async resolveDriverId(
+    requiredTons: number,
+    preferredDriverId?: string
+  ): Promise<string> {
+    const preferred = (preferredDriverId || "").trim();
+    if (preferred) return preferred;
+    if (!this.userRepo) return "";
+
+    const [drivers, trips] = await Promise.all([
+      this.userRepo.getAll({ status: "active", userType: "driver" }),
+      this.tripRepo.getAll(),
+    ]);
+
+    return selectBestDriver(drivers, trips, requiredTons) || "";
+  }
 
   async execute(
     orderId: string,
@@ -79,9 +96,11 @@ export class SplitOrderTripsUseCase {
       const tripData = trips[i];
       const tripNumber =
         trips.length > 1 ? `${baseTripNumber}-${i + 1}` : baseTripNumber;
-      const isDriverAssigned = Boolean(
-        tripData.driverId && tripData.driverId.trim() !== ""
+      const resolvedDriverId = await this.resolveDriverId(
+        tripData.totalTons,
+        tripData.driverId
       );
+      const isDriverAssigned = resolvedDriverId !== "";
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
       const newTrip: Trip = {
@@ -92,7 +111,7 @@ export class SplitOrderTripsUseCase {
           `Viaje fraccionado ${i + 1} de ${trips.length} para la orden`,
         totalTons: Number(tripData.totalTons.toFixed(2)),
         status: isDriverAssigned ? "assigned" : "available",
-        assignedDriverId: tripData.driverId || undefined,
+        assignedDriverId: resolvedDriverId || undefined,
         createdAt: new Date().toISOString(),
         deliveryPin: generatedPin,
       };

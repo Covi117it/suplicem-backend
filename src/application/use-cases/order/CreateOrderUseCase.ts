@@ -148,7 +148,6 @@ export class CreateOrderUseCase {
       userLastNames,
       userEmail,
       deliveryType: data.deliveryType,
-      deliveryPreference: data.deliveryPreference || "partial",
       totalTons: calculatedTotalTons,
       pendingBalance: calculatedTotalTons,
       deliveredTons: 0,

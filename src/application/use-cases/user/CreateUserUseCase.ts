@@ -1,5 +1,6 @@
 import { User } from "../../../domain/entities/User";
 import { isValidDominicanCedula, isValidPassport } from "../../../domain/services/IdentityVerificationService";
+import { isValidRnc, normalizeTaxId } from "../../../domain/services/TaxIdService";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { AuthService } from "../../../domain/services/AuthService";
 import { RegistrationBotService } from "../../../infrastructure/services/RegistrationBotService";
@@ -50,6 +51,9 @@ export class CreateUserUseCase {
       ? rawIdentification.replace(/[^0-9]/g, "")
       : rawIdentification;
     const phone = (parsedData?.phone || parsedData?.data?.phone || "").toString().trim();
+    const rawCompanyRnc = (parsedData?.companyRnc || parsedData?.data?.companyRnc || "").toString().trim();
+    const companyRnc = rawCompanyRnc ? normalizeTaxId(rawCompanyRnc) : "";
+    const companyName = (parsedData?.companyName || parsedData?.data?.companyName || "").toString().trim();
     // 🔒 Control estricto de escalada de privilegios
     const isAuthorizedAdmin = requester?.userType === "admin" && requester?.status === "active";
     if (requestedUserType === "admin" && !isAuthorizedAdmin) {
@@ -57,9 +61,17 @@ export class CreateUserUseCase {
     }
     const userType = isAuthorizedAdmin
       ? requestedUserType
-      : requestedUserType === "driver"
-      ? "driver"
+      : ["driver", "seller"].includes(requestedUserType)
+      ? requestedUserType
       : "client";
+    if (userType === "seller") {
+      if (!companyRnc || !isValidRnc(companyRnc)) {
+        throw new Error("El RNC de la empresa no es válido (debe tener 9 u 11 dígitos).");
+      }
+      if (!companyName) {
+        throw new Error("El nombre de la empresa es obligatorio para cuentas de vendedor.");
+      }
+    }
     const status = isAuthorizedAdmin
       ? (parsedData.status || "active")
       : "pending";
@@ -152,6 +164,10 @@ export class CreateUserUseCase {
       }
       if (userType === "driver") {
         userToSave.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
+      }
+      if (userType === "seller") {
+        userToSave.companyRnc = companyRnc;
+        userToSave.companyName = companyName;
       }
 
       // 3. Guardar en Firestore

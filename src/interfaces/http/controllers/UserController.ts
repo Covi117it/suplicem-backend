@@ -7,6 +7,9 @@ import { GetUserByIdUseCase } from "../../../application/use-cases/user/GetUserB
 import { UpdateUserStatusUseCase } from "../../../application/use-cases/user/UpdateUserStatusUseCase";
 import { UpdateUserUseCase } from "../../../application/use-cases/user/UpdateUserUseCase";
 import { User } from "../../../domain/entities/User";
+import { IdentityCacheFirestoreRepository } from "../../../infrastructure/firestore/IdentityCacheFirestoreRepository";
+import { JceIdentityService } from "../../../infrastructure/services/JceIdentityService";
+import { VerifyCedulaUseCase } from "../../../application/use-cases/identity/VerifyCedulaUseCase";
 
 const userRepo = new UserFirestoreRepository();
 const authService = new FirebaseAuthService();
@@ -15,6 +18,10 @@ const getAllUsersUseCase = new GetAllUsersUseCase(userRepo);
 const getUserByIdUseCase = new GetUserByIdUseCase(userRepo);
 const updateUserStatusUseCase = new UpdateUserStatusUseCase(userRepo, authService);
 const updateUserUseCase = new UpdateUserUseCase(userRepo);
+const verifyCedulaUseCase = new VerifyCedulaUseCase(
+  new JceIdentityService(),
+  new IdentityCacheFirestoreRepository()
+);
 
 export class UserController {
   
@@ -55,6 +62,19 @@ export class UserController {
       console.error(error);
       const isForbidden = error.message?.includes("No puedes desactivar");
       res.status(isForbidden ? 403 : 400).json({ success: false, message: error.message });
+    }
+  }
+
+  async verifyCedula(req: Request, res: Response) {
+    try {
+      const cedula = (req as any).validatedParams?.cedula || req.params.cedula;
+      const record = await verifyCedulaUseCase.execute(cedula);
+      res.status(200).json({ success: true, identity: record });
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "No se pudo validar la cédula",
+      });
     }
   }
 
