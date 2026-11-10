@@ -6,6 +6,7 @@ import {
   ResendVerificationSchema,
   RequestOtpSchema,
   VerifyOtpSchema,
+  RegisterWithPhoneSchema,
 } from "../schemas/authSchemas";
 import { Router } from "express";
 import { AuthController } from "../controllers/AuthController";
@@ -34,6 +35,12 @@ export const authRoutes = (router: Router) => {
     otpVerifyLimiter,
     validate(VerifyOtpSchema),
     (req, res) => authController.verifyOtp(req, res)
+  );
+  router.post(
+    "/auth/register-phone",
+    otpVerifyLimiter,
+    validate(RegisterWithPhoneSchema),
+    (req, res) => authController.registerWithPhone(req, res)
   );
   router.post("/auth/refresh-token", validate(RefreshTokenSchema), (req, res) =>
     authController.refreshToken(req, res)

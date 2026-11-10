@@ -26,6 +26,14 @@ export class VerifyOtpUseCase {
       );
     }
 
+    if ((challenge.purpose || "login") === "register") {
+      throw new OtpError(
+        "Este código es para completar un registro. Finaliza el registro con tus datos.",
+        400,
+        "OTP_PURPOSE_MISMATCH"
+      );
+    }
+
     if (new Date(challenge.expiresAt).getTime() < Date.now()) {
       await this.otpRepo.delete(phone);
       throw new OtpError(

@@ -38,7 +38,7 @@ export class SplitSingleTripUseCase {
 
     const trip = await this.tripRepo.getById(tripId);
     if (!trip) throw new Error("Viaje no encontrado");
-    if (trip.status !== "available" && trip.status !== "assigned") {
+    if (!["available", "assigned", "accepted"].includes(trip.status)) {
       throw new Error(`No se puede fraccionar un viaje en estado '${trip.status}'`);
     }
 
