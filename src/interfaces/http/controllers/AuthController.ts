@@ -7,9 +7,15 @@ import { GetCurrentUserUseCase } from "../../../application/use-cases/user/GetCu
 import { RecoverPasswordUseCase } from "../../../application/use-cases/auth/RecoverPasswordUseCase";
 import { ResendVerificationUseCase } from "../../../application/use-cases/auth/ResendVerificationUseCase";
 import { RegistrationBotService } from "../../../infrastructure/services/RegistrationBotService";
+import { OtpFirestoreRepository } from "../../../infrastructure/firestore/OtpFirestoreRepository";
+import { TwilioSmsService } from "../../../infrastructure/services/TwilioSmsService";
+import { RequestOtpUseCase } from "../../../application/use-cases/auth/RequestOtpUseCase";
+import { VerifyOtpUseCase } from "../../../application/use-cases/auth/VerifyOtpUseCase";
 
 const authService = new FirebaseAuthService();
 const userRepo = new UserFirestoreRepository();
+const otpRepo = new OtpFirestoreRepository();
+const smsService = new TwilioSmsService();
 const botService = new RegistrationBotService();
 
 export class AuthController {
@@ -18,7 +24,9 @@ export class AuthController {
     private refreshTokenUseCase = new RefreshTokenUseCase(authService),
     private recoverPasswordUseCase = new RecoverPasswordUseCase(authService),
     private getCurrentUserUseCase = new GetCurrentUserUseCase(userRepo),
-    private resendVerificationUseCase = new ResendVerificationUseCase(authService, botService)
+    private resendVerificationUseCase = new ResendVerificationUseCase(authService, botService),
+    private requestOtpUseCase = new RequestOtpUseCase(userRepo, otpRepo, smsService),
+    private verifyOtpUseCase = new VerifyOtpUseCase(otpRepo, userRepo, authService)
   ) {}
 
   async login(req: Request, res: Response) {
@@ -46,6 +54,34 @@ export class AuthController {
         success: false,
         code: isInactive ? "ACCOUNT_INACTIVE" : undefined,
         message,
+      });
+    }
+  }
+
+  async requestOtp(req: Request, res: Response) {
+    try {
+      const { phone } = req.body;
+      const result = await this.requestOtpUseCase.execute(phone);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        code: error.code,
+        message: error.message || "No se pudo enviar el código de verificación",
+      });
+    }
+  }
+
+  async verifyOtp(req: Request, res: Response) {
+    try {
+      const { phone, code } = req.body;
+      const result = await this.verifyOtpUseCase.execute(phone, code);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(error.statusCode || 400).json({
+        success: false,
+        code: error.code,
+        message: error.message || "No se pudo verificar el código",
       });
     }
   }

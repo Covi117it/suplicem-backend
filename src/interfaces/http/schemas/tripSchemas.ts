@@ -34,6 +34,18 @@ export const UpdateTripStatusSchema = z
   .refine((data) => Boolean(data.status || data.targetStatus), {
     message: "Debes enviar 'status' o 'targetStatus'.",
   })
+  .refine(
+    (data) => {
+      const nextStatus = data.targetStatus || data.status;
+      if (nextStatus !== "canceled") return true;
+      const reason = (data.cancellationReason || data.reason || "").trim();
+      return reason.length >= 5;
+    },
+    {
+      message: "El motivo de cancelación debe tener al menos 5 caracteres.",
+      path: ["cancellationReason"],
+    }
+  )
   .transform((data) => ({
     ...data,
     targetStatus: data.targetStatus || data.status,

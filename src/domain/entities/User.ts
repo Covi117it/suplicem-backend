@@ -16,6 +16,8 @@ export interface User {
   lastNames: string;
   phone: string;
   userType: "client" | "driver" | "admin" | "seller";
+  companyRnc?: string;
+  companyName?: string;
   addresses?: Address[] | null;
   vehicle?: {
     brand: string;

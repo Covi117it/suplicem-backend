@@ -25,7 +25,6 @@ export const CreateOrderSchema = z
     deliveryType: z.enum(["almacen", "domicilio"], {
       message: "deliveryType debe ser 'almacen' o 'domicilio'",
     }),
-    deliveryPreference: z.enum(["partial", "single_trip"]).optional().default("partial"),
     deliveries: z
       .array(
         z.object({
@@ -112,22 +111,31 @@ export const CreateOrderSchema = z
     }
   });
 
-export const UpdateOrderStatusSchema = z.object({
-  status: z.enum(["approved", "rejected", "completed"], {
-    message: "status debe ser 'approved', 'rejected' o 'completed'",
-  }),
-  reason: z.string().optional(),
-  driverId: z.string().optional(),
-  tripsPlan: z
-    .array(
-      z.object({
-        totalTons: z.number().positive("totalTons debe ser mayor a 0"),
-        driverId: z.string().optional(),
-        comments: z.string().optional(),
-      })
-    )
-    .optional(),
-});
+export const UpdateOrderStatusSchema = z
+  .object({
+    status: z.enum(["approved", "rejected", "completed"], {
+      message: "status debe ser 'approved', 'rejected' o 'completed'",
+    }),
+    reason: z.string().optional(),
+    driverId: z.string().optional(),
+    tripsPlan: z
+      .array(
+        z.object({
+          totalTons: z.number().positive("totalTons debe ser mayor a 0"),
+          driverId: z.string().optional(),
+          comments: z.string().optional(),
+        })
+      )
+      .optional(),
+  })
+  .refine(
+    (data) =>
+      data.status !== "rejected" || (data.reason || "").trim().length >= 5,
+    {
+      message: "El motivo de rechazo debe tener al menos 5 caracteres.",
+      path: ["reason"],
+    }
+  );
 
 
 export const UpdateOrderDeliveriesSchema = z

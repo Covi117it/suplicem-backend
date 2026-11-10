@@ -1,5 +1,6 @@
 import { User } from "../../../domain/entities/User";
 import { isValidDominicanCedula, isValidPassport } from "../../../domain/services/IdentityVerificationService";
+import { isValidRnc, normalizeTaxId } from "../../../domain/services/TaxIdService";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { AuthService } from "../../../domain/services/AuthService";
 import { RegistrationBotService } from "../../../infrastructure/services/RegistrationBotService";
@@ -50,6 +51,9 @@ export class CreateUserUseCase {
       ? rawIdentification.replace(/[^0-9]/g, "")
       : rawIdentification;
     const phone = (parsedData?.phone || parsedData?.data?.phone || "").toString().trim();
+    const rawCompanyRnc = (parsedData?.companyRnc || parsedData?.data?.companyRnc || "").toString().trim();
+    const companyRnc = rawCompanyRnc ? normalizeTaxId(rawCompanyRnc) : "";
+    const companyName = (parsedData?.companyName || parsedData?.data?.companyName || "").toString().trim();
     // 🔒 Control estricto de escalada de privilegios
     const isAuthorizedAdmin = requester?.userType === "admin" && requester?.status === "active";
     const isAuthorizedSeller = requester?.userType === "seller" && requester?.status === "active";
@@ -64,6 +68,14 @@ export class CreateUserUseCase {
       : requestedUserType === "driver" && !isAuthorizedSeller
       ? "driver"
       : "client";
+    if (companyRnc) {
+      if (!isValidRnc(companyRnc)) {
+        throw new Error("El RNC de la empresa no es válido (debe tener 9 u 11 dígitos).");
+      }
+      if (!companyName) {
+        throw new Error("El nombre de la empresa es obligatorio al registrar con RNC.");
+      }
+    }
     const status = isAuthorizedAdmin || isAuthorizedSeller
       ? (parsedData.status || "active")
       : "pending";
@@ -156,6 +168,10 @@ export class CreateUserUseCase {
       }
       if (userType === "driver") {
         userToSave.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
+      }
+      if (companyRnc) {
+        userToSave.companyRnc = companyRnc;
+        userToSave.companyName = companyName;
       }
       if (isAuthorizedSeller && userType === "client") {
         userToSave.sellerId = requester!.uid;

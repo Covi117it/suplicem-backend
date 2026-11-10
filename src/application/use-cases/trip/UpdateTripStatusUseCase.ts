@@ -14,8 +14,8 @@ export class UpdateTripStatusUseCase {
     if (!tripId || !targetStatus) {
       throw new Error("ID del viaje o status faltante.");
     }
-    if (targetStatus === "canceled" && (!cancellationReason || !cancellationReason.trim())) {
-      throw new Error("Se requiere un motivo o comentario para cancelar el viaje.");
+    if (targetStatus === "canceled" && (!cancellationReason || cancellationReason.trim().length < 5)) {
+      throw new Error("El motivo de cancelación debe tener al menos 5 caracteres.");
     }
     const trip = await this.tripRepo.getById(tripId);
     if (!trip) {

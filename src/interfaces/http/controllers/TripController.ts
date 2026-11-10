@@ -38,7 +38,7 @@ export class TripController {
     private getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo),
     private assignTripDriverUseCase = new AssignTripDriverUseCase(tripRepo, userRepo),
     private splitOrderTripsUseCase = new SplitOrderTripsUseCase(tripRepo, orderRepo, userRepo),
-    private splitSingleTripUseCase = new SplitSingleTripUseCase(tripRepo, orderRepo)
+    private splitSingleTripUseCase = new SplitSingleTripUseCase(tripRepo, orderRepo, userRepo)
   ) {}
 
 

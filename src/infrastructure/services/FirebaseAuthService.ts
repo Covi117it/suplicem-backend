@@ -178,4 +178,29 @@ export class FirebaseAuthService implements AuthService {
       console.warn(`Advertencia al revocar tokens en Auth para ${uid}:`, error?.message);
     }
   }
+
+  async createCustomToken(
+    uid: string,
+    claims?: Record<string, unknown>
+  ): Promise<string> {
+    return await auth.createCustomToken(uid, claims);
+  }
+
+  async exchangeCustomToken(customToken: string) {
+    const response = await axios.post<any>(
+      `${getGoogleApiUrl()}/accounts:signInWithCustomToken?key=${getFirebaseApiKey()}`,
+      {
+        token: customToken,
+        returnSecureToken: true,
+      }
+    );
+
+    return {
+      idToken: response.data.idToken,
+      refreshToken: response.data.refreshToken,
+      expiresIn: response.data.expiresIn,
+      uid: response.data.localId,
+      email: response.data.email,
+    };
+  }
 }

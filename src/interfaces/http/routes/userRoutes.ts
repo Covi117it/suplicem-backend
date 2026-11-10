@@ -3,7 +3,9 @@ import multer from "multer";
 import { UserController } from "../controllers/UserController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
-import { validate } from "../middlewares/validate";
+import { validate, validateParams } from "../middlewares/validate";
+import { identityLimiter } from "../middlewares/rateLimiter";
+import { CedulaParamSchema } from "../schemas/identitySchemas";
 import { normalizeUserData } from "../middlewares/normalizeUserData";
 import { authenticateOptional } from "../middlewares/authenticateOptional";
 import {
@@ -47,6 +49,15 @@ export const userRoutes = (router: Router) => {
     validate(UpdateUserStatusSchema),
     (req, res) => {
       userController.updateStatus(req, res);
+    }
+  );
+
+  router.get(
+    "/identity/cedula/:cedula",
+    identityLimiter,
+    validateParams(CedulaParamSchema),
+    (req, res) => {
+      userController.verifyCedula(req, res);
     }
   );
 

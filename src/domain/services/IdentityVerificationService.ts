@@ -1,6 +1,7 @@
+import { isValidDominicanCedula as validateCedula } from "./TaxIdService";
+
 export function isValidDominicanCedula(cedula: string): boolean {
-  const clean = (cedula || "").replace(/[^0-9]/g, "");
-  return clean.length === 11;
+  return validateCedula(cedula);
 }
 
 export function isValidPassport(passport: string): boolean {

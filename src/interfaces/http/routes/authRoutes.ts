@@ -4,17 +4,36 @@ import {
   RefreshTokenSchema,
   RecoverPasswordSchema,
   ResendVerificationSchema,
+  RequestOtpSchema,
+  VerifyOtpSchema,
 } from "../schemas/authSchemas";
 import { Router } from "express";
 import { AuthController } from "../controllers/AuthController";
 import { authenticate } from "../middlewares/authenticate";
-import { authLimiter, emailLimiter } from "../middlewares/rateLimiter";
+import {
+  authLimiter,
+  emailLimiter,
+  otpRequestLimiter,
+  otpVerifyLimiter,
+} from "../middlewares/rateLimiter";
 
 export const authRoutes = (router: Router) => {
   const authController = new AuthController();
 
   router.post("/auth/login", authLimiter, validate(LoginSchema), (req, res) =>
     authController.login(req, res)
+  );
+  router.post(
+    "/auth/otp/request",
+    otpRequestLimiter,
+    validate(RequestOtpSchema),
+    (req, res) => authController.requestOtp(req, res)
+  );
+  router.post(
+    "/auth/otp/verify",
+    otpVerifyLimiter,
+    validate(VerifyOtpSchema),
+    (req, res) => authController.verifyOtp(req, res)
   );
   router.post("/auth/refresh-token", validate(RefreshTokenSchema), (req, res) =>
     authController.refreshToken(req, res)

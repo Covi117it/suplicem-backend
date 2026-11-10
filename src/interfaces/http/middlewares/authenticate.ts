@@ -4,7 +4,7 @@ import { auth, firestore } from "../../../config/firebase";
 export interface AuthenticatedUser {
   uid: string;
   email?: string;
-  userType: "client" | "driver" | "admin";
+  userType: "client" | "driver" | "admin" | "seller";
   status?: string;
   [key: string]: any;
 }

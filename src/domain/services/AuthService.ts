@@ -29,4 +29,12 @@ export interface AuthService {
   markEmailAsVerified?(uid: string): Promise<void>;
   setUserDisabled?(uid: string, disabled: boolean): Promise<void>;
   revokeRefreshTokens?(uid: string): Promise<void>;
+  createCustomToken(uid: string, claims?: Record<string, unknown>): Promise<string>;
+  exchangeCustomToken(customToken: string): Promise<{
+    idToken: string;
+    refreshToken: string;
+    expiresIn: string;
+    uid: string;
+    email?: string;
+  }>;
 }
