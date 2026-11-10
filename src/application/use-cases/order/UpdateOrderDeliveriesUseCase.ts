@@ -62,6 +62,13 @@ export class UpdateOrderDeliveriesUseCase {
           `La cantidad asignada a la entrega del producto '${del.productId}' debe ser mayor a cero.`
         );
       }
+      const itemMeta = itemsMap.get(del.productId);
+      const isCementItem = (itemMeta?.name || "").toLowerCase().includes("cemento");
+      if (isCementItem && (qty < 50 || qty % 50 !== 0)) {
+        throw new Error(
+          `Cada entrega fraccionada de ${itemMeta?.name || "cemento"} debe ser a partir de 50 fundas (en múltiplos de 50).`
+        );
+      }
       const current = requestedMap.get(del.productId) || 0;
       requestedMap.set(del.productId, current + qty);
     }

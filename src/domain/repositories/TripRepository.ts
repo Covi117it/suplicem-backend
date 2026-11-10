@@ -18,6 +18,7 @@ export interface TripRepository {
     id: string;
     tripNumber: string;
     status: string;
+    totalTons?: number;
     assignedDriverId: string;
     driver: any | null;
     deliveryPin?: string;

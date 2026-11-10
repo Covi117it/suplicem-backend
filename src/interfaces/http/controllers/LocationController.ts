@@ -27,8 +27,8 @@ export class LocationController {
     const { driverId } = req.params;
     const authUser = (req as any).user;
 
-    // Prevención de BOLA/IDOR: Solo el propio conductor o un admin pueden consultar su GPS en vivo
-    if (authUser?.userType !== "admin" && authUser?.uid !== driverId) {
+    // Prevención de BOLA/IDOR: Solo administradores, vendedores autorizados o el propio conductor pueden consultar su GPS en vivo
+    if (authUser?.userType !== "admin" && authUser?.userType !== "seller" && authUser?.uid !== driverId) {
       return res.status(403).json({
         success: false,
         message: "No tienes permiso para consultar la ubicación de este conductor",

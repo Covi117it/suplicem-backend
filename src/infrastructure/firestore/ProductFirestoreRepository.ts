@@ -2,13 +2,18 @@ import { firestore } from "../../config/firebase";
 import { Product } from "../../domain/entities/Product";
 import { ProductRepository } from "../../domain/repositories/ProductRepository";
 
+const LOCAL_PRODUCT_IMAGE_URL =
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST
+    ? `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/suplicem-dev.firebasestorage.app/o/products%2Fprod_1792086785383.jpeg?alt=media&token=87c7f0c5-a3c5-42c4-92ef-f0be9cfea978`
+    : "https://firebasestorage.googleapis.com/v0/b/suplicem-dev.firebasestorage.app/o/products%2Fprod_1792086785383.jpeg?alt=media&token=87c7f0c5-a3c5-42c4-92ef-f0be9cfea978";
+
 const DEFAULT_PRODUCTS = [
   {
     name: "Funda de Cemento Gris Titan (42.5kg)",
     unit: "fundas",
     weightKg: 42.5,
     price: 510,
-    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    imageUrl: LOCAL_PRODUCT_IMAGE_URL,
     createdAt: new Date().toISOString(),
   },
   {
@@ -16,7 +21,7 @@ const DEFAULT_PRODUCTS = [
     unit: "fundas",
     weightKg: 42.5,
     price: 500,
-    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    imageUrl: LOCAL_PRODUCT_IMAGE_URL,
     createdAt: new Date().toISOString(),
   },
   {
@@ -24,7 +29,7 @@ const DEFAULT_PRODUCTS = [
     unit: "fundas",
     weightKg: 40.0,
     price: 680,
-    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    imageUrl: LOCAL_PRODUCT_IMAGE_URL,
     createdAt: new Date().toISOString(),
   },
   {
@@ -32,7 +37,7 @@ const DEFAULT_PRODUCTS = [
     unit: "quintal",
     weightKg: 45.36,
     price: 3200,
-    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    imageUrl: LOCAL_PRODUCT_IMAGE_URL,
     createdAt: new Date().toISOString(),
   },
   {
@@ -40,7 +45,7 @@ const DEFAULT_PRODUCTS = [
     unit: "metro_cubico",
     weightKg: 1400.0,
     price: 1100,
-    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    imageUrl: LOCAL_PRODUCT_IMAGE_URL,
     createdAt: new Date().toISOString(),
   },
   {
@@ -48,7 +53,7 @@ const DEFAULT_PRODUCTS = [
     unit: "metro_cubico",
     weightKg: 1500.0,
     price: 1300,
-    imageUrl: "https://enfoco.com.do/test/suplicem/cemento.jpg",
+    imageUrl: LOCAL_PRODUCT_IMAGE_URL,
     createdAt: new Date().toISOString(),
   },
 ];
@@ -98,14 +103,44 @@ export class ProductFirestoreRepository implements ProductRepository {
 
       const productsFromDb = snapshot.docs.map((doc) => {
         const data = doc.data();
+        const unit = data.unit || data.unidad || "fundas";
+        const name = data.name || data.nombre || data.title || "";
+        const price = Number(data.price || data.precio || 0);
+        const isCement = unit === "fundas" || name.toLowerCase().includes("cemento");
+        const lotSize = Number(data.lotSize || (isCement ? 500 : 0)) || undefined;
+        const defaultLotPrices: Record<string, number> | undefined = isCement
+          ? Array.from({ length: 20 }, (_, i) => (i + 1) * 50).reduce((acc, l) => {
+              acc[String(l)] = Number(
+                (data.lotPrices?.[String(l)] ?? price * l).toFixed(2)
+              );
+              return acc;
+            }, {} as Record<string, number>)
+          : data.lotPrices;
+        const lotPrice =
+          data.lotPrice !== undefined
+            ? Number(data.lotPrice)
+            : lotSize && defaultLotPrices?.[String(lotSize)]
+            ? defaultLotPrices[String(lotSize)]
+            : lotSize
+            ? Number((price * lotSize).toFixed(2))
+            : undefined;
         return {
           id: doc.id,
-          name: data.name || data.nombre || data.title || "",
-          unit: data.unit || data.unidad || "fundas",
-          price: Number(data.price || data.precio || 0),
-          imageUrl: data.imageUrl || data.image || data.foto || "https://enfoco.com.do/test/suplicem/cemento.jpg",
-          createdAt: data.createdAt || new Date().toISOString(),
           ...data,
+          name,
+          unit,
+          price,
+          lotSize,
+          lotPrice,
+          lotPrices: defaultLotPrices,
+          manualLotPrices: data.manualLotPrices || undefined,
+          imageUrl:
+            !data.imageUrl ||
+            data.imageUrl.includes("enfoco.com.do") ||
+            data.imageUrl.startsWith("blob:")
+              ? LOCAL_PRODUCT_IMAGE_URL
+              : data.imageUrl,
+          createdAt: data.createdAt || new Date().toISOString(),
         };
       }) as Product[];
 

@@ -63,9 +63,26 @@ export class TripController {
     }
   }
 
-  async getAll(_req: Request, res: Response) {
+  async getAll(req: Request, res: Response) {
     try {
-      const trips = await this.getAllTripsUseCase.execute();
+      const authUser = (req as any).user;
+      let trips = await this.getAllTripsUseCase.execute();
+
+      // 🛡️ Regla de Seguridad de Cartera:
+      // Si quien consulta es un vendedor, SOLO puede ver viajes asociados a las órdenes de sus clientes
+      if (authUser?.userType === "seller") {
+        const sellerOrders = await orderRepo.getAll({ sellerId: authUser.uid });
+        const sellerOrderIds = new Set<string>();
+        sellerOrders.forEach((o) => {
+          if (o.id) sellerOrderIds.add(o.id);
+          if (o.orderNumber !== undefined) sellerOrderIds.add(String(o.orderNumber));
+        });
+
+        trips = trips.filter((t) =>
+          (t.orderIds || []).some((id) => sellerOrderIds.has(id))
+        );
+      }
+
       res.status(200).json({ success: true, trips });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || "Error al obtener los viajes" });
@@ -126,14 +143,21 @@ export class TripController {
   async getTripByOrderId(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
-      const trip = await this.getTripByOrderIdUseCase.execute(req.params.id);
-      if (!trip) {
-        return res.status(404).json({ success: false, message: "Viaje no encontrado" });
+      const orderId = req.params.id;
+      const result = await this.getTripByOrderIdUseCase.execute(orderId);
+
+      if (!result.trip && result.trips.length === 0) {
+        return res.status(404).json({ success: false, message: "Viajes no encontrados" });
       }
-      if (authUser?.userType === "driver" && trip.assignedDriverId !== authUser.uid) {
+      if (authUser?.userType === "driver" && result.trip && result.trip.assignedDriverId !== authUser.uid) {
         return res.status(403).json({ success: false, message: "No tienes permiso para ver este viaje" });
       }
-      res.status(200).json({ success: true, trip });
+
+      res.status(200).json({
+        success: true,
+        trip: result.trip,
+        trips: result.trips,
+      });
     } catch (error: any) {
       const status = error.message?.includes("permiso") ? 403 : 404;
       res.status(status).json({ success: false, message: error.message || "Error al obtener el viaje" });

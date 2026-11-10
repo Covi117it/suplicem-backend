@@ -25,8 +25,8 @@ if (!getApps().length) {
 
   admin.initializeApp({
     credential,
-    projectId: process.env.FIREBASE_PROJECT_ID || "suplicem-ce464",
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "suplicem-ce464.firebasestorage.app",
+    projectId: process.env.FIREBASE_PROJECT_ID || "suplicem-dev",
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "suplicem-dev.firebasestorage.app",
   });
 }
 

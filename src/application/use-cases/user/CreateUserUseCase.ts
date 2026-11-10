@@ -52,15 +52,19 @@ export class CreateUserUseCase {
     const phone = (parsedData?.phone || parsedData?.data?.phone || "").toString().trim();
     // 🔒 Control estricto de escalada de privilegios
     const isAuthorizedAdmin = requester?.userType === "admin" && requester?.status === "active";
+    const isAuthorizedSeller = requester?.userType === "seller" && requester?.status === "active";
     if (requestedUserType === "admin" && !isAuthorizedAdmin) {
       throw new Error("Acceso denegado: solo un administrador activo puede crear cuentas con rol admin.");
     }
+    if (requestedUserType === "seller" && !isAuthorizedAdmin) {
+      throw new Error("Acceso denegado: solo un administrador activo puede crear cuentas con rol seller.");
+    }
     const userType = isAuthorizedAdmin
       ? requestedUserType
-      : requestedUserType === "driver"
+      : requestedUserType === "driver" && !isAuthorizedSeller
       ? "driver"
       : "client";
-    const status = isAuthorizedAdmin
+    const status = isAuthorizedAdmin || isAuthorizedSeller
       ? (parsedData.status || "active")
       : "pending";
     if (identificationType === "Cedula") {
@@ -81,8 +85,8 @@ export class CreateUserUseCase {
     );
     const { uid, idToken, refreshToken, expiresIn } = authResult as any;
 
-    // Si la cuenta la creó un Administrador autorizado, marcar emailVerified: true inmediatamente
-    if (isAuthorizedAdmin && this.authService.markEmailAsVerified) {
+    // Si la cuenta la creó un Administrador o Vendedor autorizado, marcar emailVerified: true inmediatamente
+    if ((isAuthorizedAdmin || isAuthorizedSeller) && this.authService.markEmailAsVerified) {
       await this.authService.markEmailAsVerified(uid);
     }
 
@@ -152,6 +156,11 @@ export class CreateUserUseCase {
       }
       if (userType === "driver") {
         userToSave.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
+      }
+      if (isAuthorizedSeller && userType === "client") {
+        userToSave.sellerId = requester!.uid;
+      } else if (isAuthorizedAdmin && parsedData.sellerId) {
+        userToSave.sellerId = parsedData.sellerId;
       }
 
       // 3. Guardar en Firestore

@@ -4,6 +4,7 @@ export interface UserFilters {
   status?: string;
   userType?: string;
   aiRiskFlag?: boolean;
+  sellerId?: string;
 }
 
 export interface UserRepository {

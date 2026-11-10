@@ -63,19 +63,23 @@ export class UserController {
       const { id } = req.params;
       const authUser = (req as any).user;
 
-      // Prevención de BOLA/IDOR: Solo el propio usuario o un admin pueden consultar este perfil
-      if (authUser?.userType !== "admin" && authUser?.uid !== id) {
-        return res.status(403).json({
-          success: false,
-          message: "No tienes permiso para ver la información de este usuario",
-        });
-      }
-
       const user = await getUserByIdUseCase.execute(id);
       if (!user) {
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado",
+        });
+      }
+
+      // Prevención de BOLA/IDOR: Solo Admin, el propio usuario o el Vendedor asignado pueden consultar este perfil
+      const isOwner = authUser?.uid === id;
+      const isAdmin = authUser?.userType === "admin";
+      const isAssignedSeller = authUser?.userType === "seller" && user.sellerId === authUser?.uid;
+
+      if (!isAdmin && !isOwner && !isAssignedSeller) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para ver la información de este usuario",
         });
       }
 
@@ -93,6 +97,7 @@ export class UserController {
 
   async getAll(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
       const { status, userType, aiRiskFlag } = req.query;
       const filters: any = {};
       if (typeof status === "string" && status !== "undefined" && status.trim()) {
@@ -101,15 +106,17 @@ export class UserController {
       if (typeof userType === "string" && userType.trim()) {
         filters.userType = userType.trim();
       }
+      // 🛡️ Regla de Seguridad de Cartera:
+      // Si quien consulta es un vendedor, SOLO puede ver clientes y forzosamente de su propia cartera
+      if (authUser?.userType === "seller") {
+        filters.userType = "client";
+        filters.sellerId = authUser.uid;
+      }
       if (aiRiskFlag !== undefined) {
         filters.aiRiskFlag = String(aiRiskFlag).toLowerCase() === "true";
       }
-
       const users = await getAllUsersUseCase.execute(filters);
-      res.status(200).json({
-        success: true,
-        users,
-      });
+      res.status(200).json({ success: true, users });
     } catch (error: any) {
       res.status(500).json({
         success: false,

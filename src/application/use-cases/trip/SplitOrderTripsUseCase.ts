@@ -2,6 +2,15 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { Trip } from "../../../domain/entities/Trip";
+import { Address } from "../../../domain/entities/User";
+
+export interface SplitTripInput {
+  totalTons: number;
+  driverId?: string;
+  comments?: string;
+  deliveryId?: string;
+  destinationAddress?: Address;
+}
 
 export class SplitOrderTripsUseCase {
   constructor(
@@ -12,7 +21,7 @@ export class SplitOrderTripsUseCase {
 
   async execute(
     orderId: string,
-    trips: Array<{ totalTons: number; driverId?: string; comments?: string }>
+    trips: Array<SplitTripInput>
   ): Promise<string[]> {
     if (!orderId) {
       throw new Error("ID de la orden es requerido");
@@ -95,6 +104,8 @@ export class SplitOrderTripsUseCase {
         assignedDriverId: tripData.driverId || undefined,
         createdAt: new Date().toISOString(),
         deliveryPin: generatedPin,
+        deliveryId: tripData.deliveryId || undefined,
+        destinationAddress: tripData.destinationAddress || undefined,
       };
 
       const newId = await this.tripRepo.createTripAtomic(newTrip, [orderId]);

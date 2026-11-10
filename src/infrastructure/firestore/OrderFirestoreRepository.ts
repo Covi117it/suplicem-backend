@@ -96,6 +96,10 @@ export class OrderFirestoreRepository implements OrderRepository {
       query = query.where("userId", "==", parsedFilters.userId);
     }
 
+    if (parsedFilters.sellerId) {
+      query = query.where("sellerId", "==", parsedFilters.sellerId);
+    }
+
     const snapshot = await query.get();
 
     const rawOrders: Order[] = snapshot.docs.map((doc) => ({

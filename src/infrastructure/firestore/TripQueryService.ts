@@ -123,6 +123,7 @@ export class TripQueryService {
     assignedDriverId: string;
     driver: any | null;
     deliveryPin?: string;
+    totalTons?: number;
   } | null> {
     const tripSnap = await firestore
       .collection("trips")
@@ -145,6 +146,7 @@ export class TripQueryService {
       id: activeDoc.id,
       tripNumber: data.tripNumber,
       status: data.status,
+      totalTons: Number(data.totalTons) || 0,
       assignedDriverId: data.assignedDriverId || "",
       driver: null,
       deliveryPin: data.deliveryPin,

@@ -90,11 +90,11 @@ export const tripRoutes = (router: Router) => {
   );
 
 
-  // 3. Ver todos los viajes (Solo Administradores)
+  // 3. Ver todos los viajes (Administradores y Vendedores)
   router.get(
     "/trips",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     async (req, res) => {
       await tripController.getAll(req, res);
     }

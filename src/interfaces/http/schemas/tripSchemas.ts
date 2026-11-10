@@ -53,6 +53,18 @@ export const SplitOrderTripsSchema = z.object({
         totalTons: z.number().positive("totalTons debe ser mayor a 0"),
         driverId: z.string().optional(),
         comments: z.string().optional(),
+        deliveryId: z.string().optional(),
+        destinationAddress: z
+          .object({
+            placeId: z.string().optional(),
+            description: z.string().optional(),
+            latitude: z.number().optional(),
+            longitude: z.number().optional(),
+            additionalInfo: z.string().optional(),
+            recipientName: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
       })
     )
     .min(1, "Debe incluir al menos un viaje"),

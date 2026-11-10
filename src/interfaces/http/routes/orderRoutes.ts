@@ -30,7 +30,7 @@ export const orderRoutes = (router: Router) => {
     "/orders",
     ordersLimiter,
     authenticate,
-    requireRole(["client"]),
+    requireRole(["client", "seller", "admin"]),
     upload.single("receiptImage"),
     normalizeOrderData,
     validate(CreateOrderSchema),
@@ -44,11 +44,11 @@ export const orderRoutes = (router: Router) => {
     await orderController.getMyOrders(req, res);
   });
 
-  // 3. Ver todas las órdenes (Solo Administradores)
+  // 3. Ver todas las órdenes (Administradores y Vendedores)
   router.get(
     "/orders",
     authenticate,
-    requireRole(["admin"]),
+    requireRole(["admin", "seller"]),
     async (req, res) => {
       await orderController.getAll(req, res);
     }

@@ -54,7 +54,7 @@ export const userRoutes = (router: Router) => {
     userController.getById(req, res);
   });
 
-  router.get("/users", authenticate, requireRole(["admin"]), (req, res) => {
+  router.get("/users", authenticate, requireRole(["admin", "seller"]), (req, res) => {
     userController.getAll(req, res);
   });
 };

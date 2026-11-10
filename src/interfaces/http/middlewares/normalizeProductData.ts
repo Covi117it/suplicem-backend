@@ -20,5 +20,17 @@ export const normalizeProductData = (req: Request, _res: Response, next: NextFun
     }
   }
 
+  if (typeof req.body.manualLotPrices === "string") {
+    try {
+      req.body.manualLotPrices = JSON.parse(req.body.manualLotPrices);
+    } catch (e) {}
+  }
+
+  if (typeof req.body.lotPrices === "string") {
+    try {
+      req.body.lotPrices = JSON.parse(req.body.lotPrices);
+    } catch (e) {}
+  }
+
   next();
 };

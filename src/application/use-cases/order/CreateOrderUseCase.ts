@@ -4,16 +4,21 @@ import { ProductRepository } from "../../../domain/repositories/ProductRepositor
 import { IdempotencyRepository } from "../../../domain/repositories/IdempotencyRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { SynthIDDetectorService } from "../../../infrastructure/services/SynthIDDetectorService";
+import { TonnageCalculatorService } from "../../../domain/services/TonnageCalculatorService";
+import { OrderPricingService } from "../../../domain/services/OrderPricingService";
+import { OrderPolicyValidatorService } from "../../../domain/services/OrderPolicyValidatorService";
 import { CreateOrderDto } from "../../dtos/OrderDtos";
 
 export class CreateOrderUseCase {
-  private synthIDDetector = new SynthIDDetectorService();
-
   constructor(
     private orderRepo: OrderRepository,
     private productRepo?: ProductRepository,
     private idempotencyRepo?: IdempotencyRepository,
-    private userRepo?: UserRepository
+    private userRepo?: UserRepository,
+    private synthIDDetector: SynthIDDetectorService = new SynthIDDetectorService(),
+    private tonnageCalculator: TonnageCalculatorService = new TonnageCalculatorService(),
+    private pricingService: OrderPricingService = new OrderPricingService(),
+    private policyValidator: OrderPolicyValidatorService = new OrderPolicyValidatorService()
   ) {}
 
   async execute(
@@ -32,8 +37,7 @@ export class CreateOrderUseCase {
       }
     }
 
-    const orderNumber = await this.orderRepo.getNextOrderNumber();
-
+    // 2. Análisis de riesgo del comprobante con IA
     let aiRiskFlag = false;
     let aiRiskScore = 0;
     let aiRiskReason = "";
@@ -45,104 +49,69 @@ export class CreateOrderUseCase {
       aiRiskReason = analysis.reason;
     }
 
+    // 3. Validación y Tarificación de Productos delegada a OrderPricingService
+    if (!this.productRepo) {
+      throw new Error("Repositorio de productos no disponible.");
+    }
+
+    const isSellerAssisted = Boolean(data.createdBySellerId);
     const validatedItems: OrderItem[] = [];
 
     for (const item of data.items) {
-      if (item.quantity <= 0) {
-        throw new Error(`La cantidad para el producto ${item.productId} debe ser mayor a cero.`);
-      }
-
-      if (!this.productRepo) {
-        throw new Error("Repositorio de productos no disponible.");
-      }
-
       const product = await this.productRepo.findById(item.productId);
       if (!product) {
         throw new Error(`Producto no encontrado o no disponible: ${item.productId}`);
       }
 
-      const unitPrice = product.price;
-      const name = product.name;
-      const isCement = name.toLowerCase().includes("cemento");
-      const unit = isCement ? "fundas" : (product.unit || "fundas");
-      const subtotal = Number((unitPrice * item.quantity).toFixed(2));
-
-      validatedItems.push({
-        productId: item.productId,
-        name,
-        unit,
-        quantity: item.quantity,
-        unitPrice,
-        subtotal,
-        weightKg: product.weightKg,
-      });
+      const validatedItem = this.pricingService.validateAndCalculateItem(
+        product,
+        item.quantity,
+        isSellerAssisted
+      );
+      validatedItems.push(validatedItem);
     }
 
+    // 4. Cálculo de Toneladas delegado a TonnageCalculatorService
+    const calculatedTotalTons = this.tonnageCalculator.calculateTotalTons(validatedItems);
+
+    // 5. Enriquecimiento de Usuario y Vendedor
     let userPhone = "";
     let userNames = "";
     let userLastNames = "";
     let userEmail = "";
+    let assignedSellerId = data.createdBySellerId;
 
-    if (this.userRepo) {
-      try {
-        const u = await this.userRepo.getById(data.userId);
-        if (u) {
-          userPhone = u.phone || "";
-          userNames = u.names || "";
-          userLastNames = u.lastNames || "";
-          userEmail = u.email || "";
+    if (this.userRepo && data.userId) {
+      const client = await this.userRepo.getById(data.userId);
+
+      // Aplicar políticas de negocio (SRP: Cartera de vendedor y elegibilidad de crédito)
+      this.policyValidator.validateSellerPortfolio(client, data.createdBySellerId);
+      this.policyValidator.validateCreditEligibility(client, data.paymentMethod);
+
+      if (client) {
+        userPhone = client.phone || "";
+        userNames = client.names || "";
+        userLastNames = client.lastNames || "";
+        userEmail = client.email || "";
+        if (!assignedSellerId && client.sellerId) {
+          assignedSellerId = client.sellerId;
         }
-      } catch (e) {
-        console.warn("No se pudo obtener datos del usuario al crear orden:", e);
       }
     }
 
+    const orderNumber = await this.orderRepo.getNextOrderNumber();
     const resolvedDeliveryAddress =
       data.deliveryAddress ||
       (data.deliveries && data.deliveries.length > 0 && data.deliveries[0].address
         ? data.deliveries[0].address
         : undefined);
 
-    // Regla Oficial Suplicem:
-    // Cada producto calcula sus toneladas basándose en su peso real (weightKg) o factor oficial:
-    // - 1 funda de Cemento Gris = 42.5 kg (0.0425 t)
-    // - 1 funda de Cemento Blanco / Especial = 40.0 kg (0.040 t)
-    // - 1 funda de Arena = 40.0 kg (0.040 t)
-    // - 1 m³ de agregado/arena = 1.40 t
-    // - 1 quintal de varilla = 45.36 kg (0.04536 t)
-    const calculatedTotalTons = validatedItems.reduce((acc, item) => {
-      const count = Number(item.quantity) || 0;
-      const itemName = (item.name || "").toLowerCase();
-      const isCement = item.unit === "fundas" || !item.unit || itemName.includes("cemento");
-
-      let factorInTons = 0.0425;
-      if (item.weightKg && item.weightKg > 0) {
-        factorInTons = item.weightKg / 1000;
-      } else if (item.unit === "metro_cubico" || itemName.includes("metro")) {
-        factorInTons = 1.4;
-      } else if (item.unit === "quintal" || itemName.includes("quintal")) {
-        factorInTons = 0.04536;
-      } else if (item.unit === "tonelada" || item.unit === "toneladas") {
-        factorInTons = 1.0;
-      } else if (isCement) {
-        const isSpecial =
-          itemName.includes("blanco") ||
-          itemName.includes("especial") ||
-          itemName.includes("estructural") ||
-          itemName.includes("40kg") ||
-          itemName.includes("40 kg");
-        factorInTons = isSpecial ? 0.0400 : 0.0425;
-      } else if (item.unit === "fundas" || itemName.includes("arena")) {
-        factorInTons = 0.0400;
-      }
-
-      const tons = Number((count * factorInTons).toFixed(2));
-      return acc + tons;
-    }, 0);
-
+    // 6. Ensamblado de la Entidad Order
     const order: Order = {
       orderNumber,
       userId: data.userId,
+      sellerId: assignedSellerId,
+      createdBySellerId: data.createdBySellerId,
       userPhone,
       userNames,
       userLastNames,
@@ -160,10 +129,11 @@ export class CreateOrderUseCase {
         images: [],
       })),
       items: validatedItems,
-      paymentMethod: data.paymentMethod, 
-      bankAccountId: data.bankAccountId, 
-      creditNote: data.creditNote, 
+      paymentMethod: data.paymentMethod,
+      bankAccountId: data.bankAccountId,
+      creditNote: data.creditNote,
       comments: data.comments || "",
+      receiptImage: data.receiptImage,
       status: "pending",
       createdAt: new Date().toISOString(),
       aiRiskFlag,
@@ -171,13 +141,9 @@ export class CreateOrderUseCase {
       aiRiskReason: aiRiskFlag ? aiRiskReason : undefined,
     };
 
-    if (data.receiptImage) {
-      order.receiptImage = data.receiptImage;
-    }
-
     const result = await this.orderRepo.create(order);
 
-    // 2. Guardar resultado de la compra para futuros reintentos de red
+    // 7. Guardar resultado de la compra para futuros reintentos de red
     if (data.idempotencyKey && this.idempotencyRepo) {
       await this.idempotencyRepo.complete(data.idempotencyKey, data.userId, result);
     }

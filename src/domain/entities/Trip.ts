@@ -1,3 +1,5 @@
+import { Address } from "./User";
+
 export interface Trip {
   id?: string;
   tripNumber: string;
@@ -10,4 +12,6 @@ export interface Trip {
   driver?: any;
   cancellationReason?: string;
   deliveryPin?: string;
+  deliveryId?: string;
+  destinationAddress?: Address;
 }

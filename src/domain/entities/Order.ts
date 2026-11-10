@@ -58,4 +58,7 @@ export interface Order {
   aiRiskFlag?: boolean;
   aiRiskScore?: number;
   aiRiskReason?: string;
+  sellerId?: string;
+  createdBySellerId?: string;
+  
 }

@@ -50,10 +50,22 @@ export class OrderController {
         (req.headers["idempotency-key"] as string) ||
         (req.headers["x-idempotency-key"] as string) ||
         req.body?.idempotencyKey;
+
+      let orderUserId = authUser?.uid;
+      let createdBySellerId: string | undefined = undefined;
+
+      if (authUser?.userType === "seller") {
+        createdBySellerId = authUser.uid;
+        if (req.body.userId && typeof req.body.userId === "string" && req.body.userId.trim()) {
+          orderUserId = req.body.userId.trim();
+        }
+      }
+
       const { orderId, orderNumber } = await this.createOrderUseCase.execute({
         ...req.body,
         receiptImage: receiptImageUrl,
-        userId: authUser?.uid,
+        userId: orderUserId,
+        createdBySellerId,
         idempotencyKey,
       });
       res.status(201).json({ success: true, orderId, orderNumber });
@@ -117,20 +129,29 @@ export class OrderController {
         return res.status(403).json({ success: false, message: "No tienes permiso para ver esta orden" });
       }
 
+      if (authUser?.userType === "seller" && order.sellerId && order.sellerId !== authUser.uid) {
+        return res.status(403).json({ success: false, message: "No tienes permiso para ver esta orden" });
+      }
+
       res.status(200).json({ success: true, order });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || "Error al obtener la orden" });
     }
   }
 
-  async getAll(req: Request, res: Response) {
+   async getAll(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
       const { status, deliveryType, userId, withoutTrip } = req.query;
       const filters: any = {};
       if (typeof status === "string" && status.trim()) filters.status = status.trim();
       if (typeof deliveryType === "string" && deliveryType.trim()) filters.deliveryType = deliveryType.trim();
       if (typeof userId === "string" && userId.trim()) filters.userId = userId.trim();
       if (withoutTrip !== undefined) filters.withoutTrip = String(withoutTrip).toLowerCase() === "true";
+
+      if (authUser?.userType === "seller") {
+        filters.sellerId = authUser.uid;
+      }
 
       const orders = await this.getAllOrdersUseCase.execute(filters);
       res.status(200).json({ success: true, orders });
@@ -141,6 +162,14 @@ export class OrderController {
 
   async updateStatus(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
+      if (authUser?.userType !== "admin") {
+        return res.status(403).json({
+          success: false,
+          message: "Acceso denegado: solo un administrador activo puede modificar el estado o despacho de una orden.",
+        });
+      }
+
       const { id } = req.params;
       const { status, reason, driverId, tripsPlan } = req.body;
       await this.updateOrderStatusUseCase.execute(id, status, reason, driverId, tripsPlan);
@@ -226,6 +255,14 @@ export class OrderController {
 
   async updateDeliveries(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
+      if (authUser?.userType !== "admin") {
+        return res.status(403).json({
+          success: false,
+          message: "Acceso denegado: solo un administrador activo puede reconfigurar las entregas de una orden.",
+        });
+      }
+
       const { id } = req.params;
       const { deliveryType, deliveries } = req.body;
       const updatedOrder = await this.updateOrderDeliveriesUseCase.execute(id, deliveryType, deliveries);

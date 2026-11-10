@@ -39,6 +39,10 @@ export class UpdateUserUseCase {
     if (userToUpdate.identificationImage !== undefined) {
       sanitizedUpdate.identificationImage = userToUpdate.identificationImage;
     }
+    // Permitir exclusivamente al Administrador asignar o limpiar el vendedor
+    if (isAuthorizedAdmin && userToUpdate.sellerId !== undefined) {
+      sanitizedUpdate.sellerId = userToUpdate.sellerId ? userToUpdate.sellerId.trim() : null as any;
+    }
 
     await this.userRepo.update(userToUpdate.uid, {
       ...existingUser,

@@ -15,7 +15,7 @@ export interface User {
   names: string;
   lastNames: string;
   phone: string;
-  userType: "client" | "driver" | "admin";
+  userType: "client" | "driver" | "admin" | "seller";
   addresses?: Address[] | null;
   vehicle?: {
     brand: string;
@@ -27,6 +27,10 @@ export interface User {
   createdAt: string;
   status: "pending" | "active" | "inactive" | "banned" | "rejected";
   driverCode?: string;
+  sellerCode?: string;
+  sellerId?: string;
+  sellerName?: string;
+  sellerPhone?: string;
   aiRiskFlag?: boolean;
   aiRiskScore?: number;
   aiRiskReason?: string;

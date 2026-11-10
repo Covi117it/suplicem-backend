@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
-export const requireRole = (allowedRoles: Array<"client" | "driver" | "admin">) => {
+export const requireRole = (allowedRoles: Array<"client" | "driver" | "admin" | "seller">) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     const user = (req as any).user;
 

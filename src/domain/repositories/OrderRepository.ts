@@ -5,6 +5,7 @@ export interface OrderFilters {
   deliveryType?: string;
   userId?: string;
   withoutTrip?: boolean;
+  sellerId?: string;
 }
 
 export interface OrderRepository {

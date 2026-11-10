@@ -29,6 +29,8 @@ export class UserFirestoreRepository implements UserRepository {
       const data = doc.data() as User;
       if (data.userType === "driver" && !data.driverCode) {
         data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
+      } else if (data.userType === "seller" && !data.sellerCode) {
+        data.sellerCode = `VEND-${doc.id.slice(0, 5).toUpperCase()}`;
       }
       return { ...data, uid: doc.id };
     } catch (error: any) {
@@ -47,6 +49,9 @@ export class UserFirestoreRepository implements UserRepository {
       if (filters?.userType) {
         query = query.where("userType", "==", filters.userType);
       }
+      if (filters?.sellerId) {
+        query = query.where("sellerId", "==", filters.sellerId);
+      }
       if (filters?.aiRiskFlag !== undefined) {
         query = query.where("aiRiskFlag", "==", filters.aiRiskFlag);
       }
@@ -56,6 +61,8 @@ export class UserFirestoreRepository implements UserRepository {
         const data = doc.data() as User;
         if (data.userType === "driver" && !data.driverCode) {
           data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
+        } else if (data.userType === "seller" && !data.sellerCode) {
+          data.sellerCode = `VEND-${doc.id.slice(0, 5).toUpperCase()}`;
         }
         return {
           ...data,

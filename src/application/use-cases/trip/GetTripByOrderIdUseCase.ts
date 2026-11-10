@@ -4,12 +4,15 @@ export class GetTripByOrderIdUseCase {
   constructor(private tripRepo: TripRepository) {}
 
   async execute(orderId: string): Promise<{
-    id: string;
-    tripNumber: string;
-    status: string;
-    assignedDriverId: string;
-    driver: any | null;
-  } | null> {
-    return await this.tripRepo.getTripByOrderId(orderId);
+    trip: any | null;
+    trips: any[];
+  }> {
+    const singleTrip = await this.tripRepo.getTripByOrderId(orderId);
+    const trips = await this.tripRepo.getTripsByOrderId(orderId);
+
+    return {
+      trip: singleTrip || (trips.length > 0 ? trips[0] : null),
+      trips,
+    };
   }
 }

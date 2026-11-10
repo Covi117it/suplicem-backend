@@ -2,7 +2,7 @@ import { User } from "../../domain/entities/User";
 
 export interface ApplicationActor {
   uid: string;
-  userType: "client" | "driver" | "admin";
+  userType: "client" | "driver" | "admin" | "seller";
   status: "pending" | "active" | "inactive" | "banned" | "rejected";
   email?: string;
 }

@@ -25,14 +25,24 @@ export class ProductController {
 
     async create(req: Request, res: Response) {
     try {
-      let { name, unit, price, imageUrl, weightKg } = req.body;
+      let { name, unit, price, lotSize, lotPrice, lotPrices, manualLotPrices, imageUrl, weightKg } = req.body;
       if (req.file) {
         imageUrl = await uploadProductImage(req.file);
       }
+      const parsedLotPrices =
+        typeof lotPrices === "string" ? JSON.parse(lotPrices) : lotPrices;
+      const parsedManualLotPrices =
+        typeof manualLotPrices === "string"
+          ? JSON.parse(manualLotPrices)
+          : manualLotPrices;
       const id = await this.createProductUseCase.execute({
         name,
         unit,
         price: Number(price),
+        lotSize: lotSize !== undefined ? Number(lotSize) : undefined,
+        lotPrice: lotPrice !== undefined ? Number(lotPrice) : undefined,
+        lotPrices: parsedLotPrices,
+        manualLotPrices: parsedManualLotPrices,
         imageUrl,
         weightKg: weightKg !== undefined ? Number(weightKg) : undefined,
       });
@@ -87,12 +97,25 @@ export class ProductController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { name, unit, price, imageUrl, weightKg } = req.body;
+      let { name, unit, price, lotSize, lotPrice, lotPrices, manualLotPrices, imageUrl, weightKg } = req.body;
+      if (req.file) {
+        imageUrl = await uploadProductImage(req.file);
+      }
+      const parsedLotPrices =
+        typeof lotPrices === "string" ? JSON.parse(lotPrices) : lotPrices;
+      const parsedManualLotPrices =
+        typeof manualLotPrices === "string"
+          ? JSON.parse(manualLotPrices)
+          : manualLotPrices;
 
       await this.updateProductUseCase.execute(id, {
         name,
         unit,
         price: price !== undefined ? Number(price) : undefined,
+        lotSize: lotSize !== undefined ? Number(lotSize) : undefined,
+        lotPrice: lotPrice !== undefined ? Number(lotPrice) : undefined,
+        lotPrices: parsedLotPrices,
+        manualLotPrices: parsedManualLotPrices,
         imageUrl,
         weightKg: weightKg !== undefined ? Number(weightKg) : undefined,
       });
