@@ -36,6 +36,7 @@ export const CreateUserSchema = z.object({
   ),
   phone: z.string().min(1, "phone es requerido"),
   userType: z.enum(["client", "driver", "admin", "seller"]).optional().default("client"),
+  personType: z.enum(["fisica", "juridica"]).optional().default("fisica"),
   sellerId: z.string().optional(),
   companyRnc: z.string().optional(),
   companyName: z.string().optional(),

@@ -148,6 +148,7 @@ export class CreateUserUseCase {
         lastNames,
         phone,
         userType,
+        personType: parsedData.personType || (companyRnc ? "juridica" : "fisica"),
         createdAt: new Date().toISOString(),
         status,
         aiRiskFlag,
