@@ -172,11 +172,13 @@ export class TripFirestoreRepository implements TripRepository {
         throw new Error(`El viaje ${tripData?.tripNumber || tripId} no está disponible para asignación (estado: ${tripData?.status}).`);
       }
 
+      const nowIso = new Date().toISOString();
       transaction.update(tripRef, {
-        status: "assigned",
+        status: "accepted",
         assignedDriverId: driverId,
         driverId: driverId,
-        assignedAt: new Date().toISOString(),
+        assignedAt: nowIso,
+        acceptedAt: nowIso,
       });
 
       const orderIds = tripData?.orderIds || [];
@@ -186,7 +188,7 @@ export class TripFirestoreRepository implements TripRepository {
           assignedDriverId: driverId,
           driverId: driverId,
           tripId: tripId,
-          tripStatus: "assigned",
+          tripStatus: "accepted",
         });
       }
     });

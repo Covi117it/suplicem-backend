@@ -25,15 +25,9 @@ export class GetAvailableTripsUseCase {
       return trips;
     }
 
-    // Filtrar: los viajes asignados a él directamente los ve siempre;
-    // los de la bolsa general solo si la carga no excede la capacidad de su camión
+    // Un conductor solo ve los viajes que le han sido asignados directamente por administración
     return trips.filter((trip) => {
-      const isMine = trip.assignedDriverId === driverId || (trip as any).driverId === driverId;
-      if (isMine) return true;
-
-      const tripTons = Number(trip.totalTons) || 0;
-      // Si el viaje no especifica tonelaje, se permite; si especifica, debe caber en el camión
-      return tripTons <= 0 || tripTons <= driverCapacity;
+      return trip.assignedDriverId === driverId || (trip as any).driverId === driverId;
     });
   }
 }

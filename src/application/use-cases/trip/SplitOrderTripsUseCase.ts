@@ -119,8 +119,10 @@ export class SplitOrderTripsUseCase {
           tripData.comments ||
           `Viaje fraccionado ${i + 1} de ${trips.length} para la orden`,
         totalTons: Number(tripData.totalTons.toFixed(2)),
-        status: isDriverAssigned ? "assigned" : "available",
+        status: isDriverAssigned ? "accepted" : "available",
         assignedDriverId: resolvedDriverId || undefined,
+        driverId: isDriverAssigned ? resolvedDriverId : undefined,
+        acceptedAt: isDriverAssigned ? new Date().toISOString() : undefined,
         createdAt: new Date().toISOString(),
         deliveryPin: generatedPin,
         deliveryId: tripData.deliveryId || undefined,

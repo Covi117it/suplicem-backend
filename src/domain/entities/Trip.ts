@@ -8,7 +8,10 @@ export interface Trip {
   totalTons: number;
   status: "available" | "assigned" | "accepted" | "in_progress" | "completed" | "canceled" | "started" | string;
   assignedDriverId?: string;
+  driverId?: string;
   createdAt: string;
+  assignedAt?: string;
+  acceptedAt?: string;
   driver?: any;
   cancellationReason?: string;
   deliveryPin?: string;

@@ -68,12 +68,12 @@ describe("SplitOrderTripsUseCase - Planificación y fraccionamiento de viajes", 
     assert.strictEqual(tripRepo.trips[0].tripNumber, "TRIP-1002-1");
     assert.strictEqual(tripRepo.trips[0].totalTons, 21.25);
     assert.strictEqual(tripRepo.trips[0].assignedDriverId, "driver-1");
-    assert.strictEqual(tripRepo.trips[0].status, "assigned");
+    assert.strictEqual(tripRepo.trips[0].status, "accepted");
 
     assert.strictEqual(tripRepo.trips[1].tripNumber, "TRIP-1002-2");
     assert.strictEqual(tripRepo.trips[1].totalTons, 21.25);
     assert.strictEqual(tripRepo.trips[1].assignedDriverId, "driver-2");
-    assert.strictEqual(tripRepo.trips[1].status, "assigned");
+    assert.strictEqual(tripRepo.trips[1].status, "accepted");
   });
 
   test("Escenario 2: Cancela viaje unificado previo en 'available' al re-fraccionar la orden", async () => {

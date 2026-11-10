@@ -52,10 +52,10 @@ describe("SplitSingleTripUseCase - Fraccionamiento de un viaje individual", () =
     assert.strictEqual(tripRepo.trips.length, 3);
     assert.strictEqual(tripRepo.trips[1].tripNumber, "TRIP-1002-1-A");
     assert.strictEqual(tripRepo.trips[1].assignedDriverId, "driver-1");
-    assert.strictEqual(tripRepo.trips[1].status, "assigned");
+    assert.strictEqual(tripRepo.trips[1].status, "accepted");
     assert.strictEqual(tripRepo.trips[2].tripNumber, "TRIP-1002-1-B");
     assert.strictEqual(tripRepo.trips[2].assignedDriverId, "driver-2");
-    assert.strictEqual(tripRepo.trips[2].status, "assigned");
+    assert.strictEqual(tripRepo.trips[2].status, "accepted");
   });
 
   test("Escenario 2: Rechaza si el tonelaje dividido supera el tonelaje del viaje original", async () => {

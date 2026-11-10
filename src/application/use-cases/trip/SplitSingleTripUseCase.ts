@@ -82,8 +82,10 @@ export class SplitSingleTripUseCase {
         orderIds,
         comments: item.comments || `Fracción ${i + 1} de ${trip.tripNumber}`,
         totalTons: Number(item.totalTons.toFixed(2)),
-        status: isAssigned ? "assigned" : "available",
+        status: isAssigned ? "accepted" : "available",
         assignedDriverId: resolvedDriverId || undefined,
+        driverId: isAssigned ? resolvedDriverId : undefined,
+        acceptedAt: isAssigned ? new Date().toISOString() : undefined,
         createdAt: new Date().toISOString(),
         deliveryPin: generatedPin,
       };

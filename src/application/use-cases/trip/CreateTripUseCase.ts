@@ -123,7 +123,7 @@ export class CreateTripUseCase {
     }
 
     const isDriverAssigned = resolvedDriverId !== "";
-    const initialStatus = isDriverAssigned ? "assigned" : "available";
+    const initialStatus = isDriverAssigned ? "accepted" : "available";
 
     // Mantener nombre limpio sin duplicar sufijos (ej. TRIP-183-2, TRIP-183-3)
     let finalTripNumber = data.tripNumber;
@@ -132,6 +132,7 @@ export class CreateTripUseCase {
       finalTripNumber = `${data.tripNumber}-${existingTripsCount + 1}`;
     }
 
+    const nowIso = new Date().toISOString();
     const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
     const newTrip: Trip = {
       tripNumber: finalTripNumber,
@@ -140,7 +141,9 @@ export class CreateTripUseCase {
       totalTons: Number(calculatedTotalTons.toFixed(2)),
       status: initialStatus,
       assignedDriverId: resolvedDriverId || undefined,
-      createdAt: new Date().toISOString(),
+      driverId: isDriverAssigned ? resolvedDriverId : undefined,
+      acceptedAt: isDriverAssigned ? nowIso : undefined,
+      createdAt: nowIso,
       deliveryPin: generatedPin,
     };
 
