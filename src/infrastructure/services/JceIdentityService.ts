@@ -18,7 +18,13 @@ export class JceIdentityService implements IdentityLookupService {
       if (process.env.NODE_ENV === "production") {
         throw new Error("El servicio de consulta de cédulas no está configurado.");
       }
-      return null;
+      // Modo desarrollo / pruebas locales sin credenciales de la JCE
+      return {
+        cedula,
+        names: "JUAN ALBERTO",
+        lastNames: "PÉREZ RODRÍGUEZ",
+        fullName: "JUAN ALBERTO PÉREZ RODRÍGUEZ",
+      };
     }
 
     try {
