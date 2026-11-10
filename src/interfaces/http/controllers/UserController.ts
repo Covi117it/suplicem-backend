@@ -10,6 +10,9 @@ import { User } from "../../../domain/entities/User";
 import { IdentityCacheFirestoreRepository } from "../../../infrastructure/firestore/IdentityCacheFirestoreRepository";
 import { JceIdentityService } from "../../../infrastructure/services/JceIdentityService";
 import { VerifyCedulaUseCase } from "../../../application/use-cases/identity/VerifyCedulaUseCase";
+import { DgiiLookupService } from "../../../infrastructure/services/DgiiLookupService";
+import { RncCacheFirestoreRepository } from "../../../infrastructure/firestore/RncCacheFirestoreRepository";
+import { VerifyRncUseCase } from "../../../application/use-cases/identity/VerifyRncUseCase";
 
 const userRepo = new UserFirestoreRepository();
 const authService = new FirebaseAuthService();
@@ -21,6 +24,10 @@ const updateUserUseCase = new UpdateUserUseCase(userRepo);
 const verifyCedulaUseCase = new VerifyCedulaUseCase(
   new JceIdentityService(),
   new IdentityCacheFirestoreRepository()
+);
+const verifyRncUseCase = new VerifyRncUseCase(
+  new DgiiLookupService(),
+  new RncCacheFirestoreRepository()
 );
 
 export class UserController {
@@ -74,6 +81,19 @@ export class UserController {
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || "No se pudo validar la cédula",
+      });
+    }
+  }
+
+  async verifyRnc(req: Request, res: Response) {
+    try {
+      const rnc = (req as any).validatedParams?.rnc || req.params.rnc;
+      const record = await verifyRncUseCase.execute(rnc);
+      res.status(200).json({ success: true, identity: record });
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "No se pudo validar el RNC",
       });
     }
   }

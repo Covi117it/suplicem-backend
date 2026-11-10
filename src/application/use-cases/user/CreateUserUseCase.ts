@@ -63,28 +63,47 @@ export class CreateUserUseCase {
     if (requestedUserType === "seller" && !isAuthorizedAdmin) {
       throw new Error("Acceso denegado: solo un administrador activo puede crear cuentas con rol seller.");
     }
+    const isJuridica = parsedData?.personType === "juridica" || !!companyRnc;
+    if (isJuridica && requestedUserType === "driver") {
+      throw new Error("Las empresas no pueden registrarse con el rol de conductor.");
+    }
     const userType = isAuthorizedAdmin
       ? requestedUserType
+      : isJuridica
+      ? "client"
       : requestedUserType === "driver" && !isAuthorizedSeller
       ? "driver"
       : "client";
-    if (companyRnc) {
-      if (!isValidRnc(companyRnc)) {
+
+    const effectiveCompanyName = companyName || (isJuridica ? names : "");
+    const effectiveCompanyRnc = companyRnc || (isJuridica ? identification : "");
+    const effectiveNames = names || effectiveCompanyName;
+    const effectiveLastNames = lastNames;
+    const effectiveIdentificationType = isJuridica && identificationType !== "Pasaporte"
+      ? "RNC"
+      : (identificationType as "Cedula" | "Pasaporte" | "RNC");
+    const effectiveIdentification = effectiveIdentificationType === "RNC"
+      ? (effectiveCompanyRnc || identification)
+      : identification;
+
+    if (effectiveCompanyRnc || effectiveIdentificationType === "RNC") {
+      const targetRnc = effectiveCompanyRnc || effectiveIdentification;
+      if (!isValidRnc(targetRnc)) {
         throw new Error("El RNC de la empresa no es válido (debe tener 9 u 11 dígitos).");
       }
-      if (!companyName) {
-        throw new Error("El nombre de la empresa es obligatorio al registrar con RNC.");
+      if (!effectiveCompanyName) {
+        throw new Error("El nombre o razón social de la empresa es obligatorio al registrar con RNC.");
       }
     }
     const status = isAuthorizedAdmin || isAuthorizedSeller
       ? (parsedData.status || "active")
       : "pending";
-    if (identificationType === "Cedula") {
-      if (!isValidDominicanCedula(identification)) {
+    if (effectiveIdentificationType === "Cedula") {
+      if (!isValidDominicanCedula(effectiveIdentification)) {
         throw new Error("El número de cédula dominicana ingresado no es válido.");
       }
-    } else if (identificationType === "Pasaporte") {
-      if (!isValidPassport(identification)) {
+    } else if (effectiveIdentificationType === "Pasaporte") {
+      if (!isValidPassport(effectiveIdentification)) {
         throw new Error("El formato del pasaporte no es válido (debe tener entre 6 y 12 caracteres alfanuméricos).");
       }
     }
@@ -141,14 +160,14 @@ export class CreateUserUseCase {
       // Guardar en Firestore con estado "pending" para aprobación del Administrador
       const userToSave: User = {
         uid,
-        identificationType,
-        identification,
+        identificationType: effectiveIdentificationType,
+        identification: effectiveIdentification,
         email,
-        names,
-        lastNames,
+        names: effectiveNames,
+        lastNames: effectiveLastNames,
         phone,
         userType,
-        personType: parsedData.personType || (companyRnc ? "juridica" : "fisica"),
+        personType: isJuridica ? "juridica" : "fisica",
         createdAt: new Date().toISOString(),
         status,
         aiRiskFlag,
@@ -164,15 +183,15 @@ export class CreateUserUseCase {
       if (parsedAddresses && Array.isArray(parsedAddresses) && parsedAddresses.length > 0) {
         userToSave.addresses = parsedAddresses;
       }
-      if (parsedVehicle) {
+      if (parsedVehicle && userType === "driver") {
         userToSave.vehicle = parsedVehicle;
       }
       if (userType === "driver") {
         userToSave.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
       }
-      if (companyRnc) {
-        userToSave.companyRnc = companyRnc;
-        userToSave.companyName = companyName;
+      if (effectiveCompanyRnc || isJuridica) {
+        userToSave.companyRnc = effectiveCompanyRnc;
+        userToSave.companyName = effectiveCompanyName;
       }
       if (isAuthorizedSeller && userType === "client") {
         userToSave.sellerId = requester!.uid;

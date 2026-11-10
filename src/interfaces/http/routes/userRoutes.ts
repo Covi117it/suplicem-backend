@@ -5,7 +5,7 @@ import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
 import { validate, validateParams } from "../middlewares/validate";
 import { identityLimiter } from "../middlewares/rateLimiter";
-import { CedulaParamSchema } from "../schemas/identitySchemas";
+import { CedulaParamSchema, RncParamSchema } from "../schemas/identitySchemas";
 import { normalizeUserData } from "../middlewares/normalizeUserData";
 import { authenticateOptional } from "../middlewares/authenticateOptional";
 import {
@@ -58,6 +58,15 @@ export const userRoutes = (router: Router) => {
     validateParams(CedulaParamSchema),
     (req, res) => {
       userController.verifyCedula(req, res);
+    }
+  );
+
+  router.get(
+    "/identity/rnc/:rnc",
+    identityLimiter,
+    validateParams(RncParamSchema),
+    (req, res) => {
+      userController.verifyRnc(req, res);
     }
   );
 

@@ -8,7 +8,7 @@ export interface Address {
 
 export interface User {
   uid: string;
-  identificationType: "Cedula" | "Pasaporte";
+  identificationType: "Cedula" | "Pasaporte" | "RNC";
   identification: string;
   identificationImage?: string;
   email: string;
