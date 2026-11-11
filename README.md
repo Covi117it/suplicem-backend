@@ -91,11 +91,23 @@ SMTP_PASS=tu_app_password_de_gmail
 # --------------------------------------------------------
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_SMS_FROM=+1809XXXXXXX
+# Remitente de Twilio. Puede ser un número de EE. UU. (incluido el trial).
+TWILIO_SMS_FROM=+1XXXXXXXXXX
 
 # Secreto para firma criptográfica de tokens OTP
 OTP_HASH_SECRET=clave_criptografica_segura_para_hash_otp
 ```
+
+> **Nota sobre Twilio Trial:** el remitente (`TWILIO_SMS_FROM`) no necesita ser
+> dominicano. En cambio, el destinatario (`user.phone`) sí debe ser un número de
+> RD (`809`, `829` o `849`). En cuentas trial solo se entrega a números
+> verificados (máximo 5) y puede ser necesario habilitar República Dominicana en
+> **Messaging → Geo permissions**. Además, el trial solo admite plantillas
+> predefinidas: el servicio reintenta automáticamente con `sms_account_alerts`
+> (o `sms_2fa` para códigos OTP). La plantilla `sms_2fa` del trial no transporta
+> el código generado por la app, así que la verificación OTP real requiere una
+> cuenta paga. Para enviar el texto personalizado también hay que actualizar la
+> cuenta.
 
 ---
 
