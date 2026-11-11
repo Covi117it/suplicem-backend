@@ -4,13 +4,14 @@ import { OrderController } from "../controllers/OrderController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
 import { ordersLimiter } from "../middlewares/rateLimiter";
-import { validate } from "../middlewares/validate";
+import { validate, validateQuery } from "../middlewares/validate";
 import {
   CreateOrderSchema,
   UpdateOrderStatusSchema,
   UpdateOrderDeliveriesSchema,
   CompleteDeliverySchema,
   AttachDeliveryProofSchema,
+  GetOrdersQuerySchema,
 } from "../schemas/orderSchemas";
 import { validateImageFile } from "../middlewares/validateImageFile";
 import multer from "multer";
@@ -49,6 +50,7 @@ export const orderRoutes = (router: Router) => {
     "/orders",
     authenticate,
     requireRole(["admin", "seller"]),
+    validateQuery(GetOrdersQuerySchema),
     async (req, res) => {
       await orderController.getAll(req, res);
     }

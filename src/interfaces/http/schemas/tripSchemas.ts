@@ -81,3 +81,13 @@ export const SplitOrderTripsSchema = z.object({
     )
     .min(1, "Debe incluir al menos un viaje"),
 });
+
+export const GetTripsQuerySchema = z
+  .object({
+    status: z.string().trim().optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .optional()
+  .default({});

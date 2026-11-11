@@ -30,25 +30,33 @@ export class TripQueryService {
     let orders: any[] = [];
     if (tripData.orderIds && tripData.orderIds.length > 0) {
       const chunks = this.chunkArray(tripData.orderIds, 10);
-      for (const chunk of chunks) {
-        const ordersSnap = await firestore
-          .collection("orders")
-          .where(FieldPath.documentId(), "in", chunk)
-          .get();
+      const orderSnapshots = await Promise.all(
+        chunks.map((chunk) =>
+          firestore
+            .collection("orders")
+            .where(FieldPath.documentId(), "in", chunk)
+            .get()
+        )
+      );
+      orderSnapshots.forEach((ordersSnap) => {
         orders.push(...ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      }
+      });
 
       const userIds = [...new Set(orders.map((o) => o.userId).filter(Boolean))];
       const userChunks = this.chunkArray(userIds, 10);
       const userMap = new Map<string, any>();
 
-      for (const chunk of userChunks) {
-        const userSnap = await firestore
-          .collection("users")
-          .where(FieldPath.documentId(), "in", chunk)
-          .get();
+      const userSnapshots = await Promise.all(
+        userChunks.map((chunk) =>
+          firestore
+            .collection("users")
+            .where(FieldPath.documentId(), "in", chunk)
+            .get()
+        )
+      );
+      userSnapshots.forEach((userSnap) => {
         userSnap.docs.forEach((d) => userMap.set(d.id, d.data()));
-      }
+      });
 
       orders = orders.map((order) => {
         const user = userMap.get(order.userId);

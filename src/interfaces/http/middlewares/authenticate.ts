@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { auth, firestore } from "../../../config/firebase";
+import { auth } from "../../../config/firebase";
+import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
+
+const userRepository = new UserFirestoreRepository();
 
 export interface AuthenticatedUser {
   uid: string;
@@ -40,12 +43,8 @@ export const authenticate = async (
   }
 
   try {
-    // 2. Obtener el rol y estado real del usuario desde Firestore
-    const userDoc = await firestore
-      .collection("users")
-      .doc(decodedToken.uid)
-      .get();
-    const userData = userDoc.data();
+    // 2. Obtener el rol y estado real del usuario desde caché/Firestore
+    const userData = await userRepository.getByIdStrict(decodedToken.uid);
     const rawUserType = userData?.userType || "client";
     const normalizedUserType = String(rawUserType).trim().toLowerCase();
 

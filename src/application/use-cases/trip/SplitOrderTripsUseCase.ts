@@ -22,18 +22,31 @@ export class SplitOrderTripsUseCase {
 
   private async resolveDriverId(
     requiredTons: number,
-    preferredDriverId?: string
+    preferredDriverId?: string,
+    cachedContext?: { drivers: any[]; trips: any[] }
   ): Promise<string> {
     const preferred = (preferredDriverId || "").trim();
     if (preferred) return preferred;
     if (!this.userRepo) return "";
 
-    const [drivers, trips] = await Promise.all([
-      this.userRepo.getAll({ status: "active", userType: "driver" }),
-      this.tripRepo.getAll(),
-    ]);
+    if (!cachedContext) {
+      const [drivers, trips] = await Promise.all([
+        this.userRepo.getAll({ status: "active", userType: "driver" }),
+        this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
+      ]);
+      return selectBestDriver(drivers, trips, requiredTons) || "";
+    }
 
-    return selectBestDriver(drivers, trips, requiredTons) || "";
+    const selected = selectBestDriver(cachedContext.drivers, cachedContext.trips, requiredTons) || "";
+    if (selected) {
+      cachedContext.trips.push({
+        assignedDriverId: selected,
+        driverId: selected,
+        status: "assigned",
+        totalTons: requiredTons,
+      });
+    }
+    return selected;
   }
 
   async execute(
@@ -100,6 +113,14 @@ export class SplitOrderTripsUseCase {
     // 4. Crear los nuevos viajes atómicos
     const createdTripIds: string[] = [];
     const baseTripNumber = `TRIP-${order.orderNumber || orderId.slice(0, 5).toUpperCase()}`;
+    const needsAutoDriver = trips.some((t) => !(t.driverId || "").trim());
+    const driverContext =
+      needsAutoDriver && this.userRepo
+        ? await Promise.all([
+            this.userRepo.getAll({ status: "active", userType: "driver" }),
+            this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
+          ]).then(([drivers, activeTrips]) => ({ drivers, trips: [...activeTrips] }))
+        : undefined;
 
     for (let i = 0; i < trips.length; i++) {
       const tripData = trips[i];
@@ -107,7 +128,8 @@ export class SplitOrderTripsUseCase {
         trips.length > 1 ? `${baseTripNumber}-${i + 1}` : baseTripNumber;
       const resolvedDriverId = await this.resolveDriverId(
         tripData.totalTons,
-        tripData.driverId
+        tripData.driverId,
+        driverContext
       );
       const isDriverAssigned = resolvedDriverId !== "";
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();

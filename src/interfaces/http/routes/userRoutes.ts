@@ -3,7 +3,7 @@ import multer from "multer";
 import { UserController } from "../controllers/UserController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
-import { validate, validateParams } from "../middlewares/validate";
+import { validate, validateParams, validateQuery } from "../middlewares/validate";
 import { identityLimiter } from "../middlewares/rateLimiter";
 import { CedulaParamSchema, RncParamSchema } from "../schemas/identitySchemas";
 import { normalizeUserData } from "../middlewares/normalizeUserData";
@@ -12,6 +12,7 @@ import {
   CreateUserSchema,
   UpdateUserSchema,
   UpdateUserStatusSchema,
+  GetUsersQuerySchema,
 } from "../schemas/userSchemas";
 
 const upload = multer({
@@ -74,7 +75,13 @@ export const userRoutes = (router: Router) => {
     userController.getById(req, res);
   });
 
-  router.get("/users", authenticate, requireRole(["admin", "seller"]), (req, res) => {
-    userController.getAll(req, res);
-  });
+  router.get(
+    "/users",
+    authenticate,
+    requireRole(["admin", "seller"]),
+    validateQuery(GetUsersQuerySchema),
+    (req, res) => {
+      userController.getAll(req, res);
+    }
+  );
 };

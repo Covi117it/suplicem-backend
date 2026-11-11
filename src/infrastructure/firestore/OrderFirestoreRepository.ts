@@ -110,40 +110,50 @@ export class OrderFirestoreRepository implements OrderRepository {
     const userIdsToFetch = [
       ...new Set(
         rawOrders
-          .filter((o) => o.userId && (!o.userPhone || !o.userNames))
+          .filter((o) => o.userId && (!o.userPhone || !o.userNames || !o.userLastNames))
           .map((o) => o.userId)
       ),
     ];
 
     const userMap = new Map<string, any>();
     if (userIdsToFetch.length > 0) {
+      const userChunks: string[][] = [];
       for (let i = 0; i < userIdsToFetch.length; i += 10) {
-        const chunk = userIdsToFetch.slice(i, i + 10);
-        try {
-          const uSnap = await firestore
-            .collection("users")
-            .where(FieldPath.documentId(), "in", chunk)
-            .get();
-          uSnap.docs.forEach((uDoc) => userMap.set(uDoc.id, uDoc.data()));
-        } catch (e) {
-          console.warn("Error fetching users for orders enrichment:", e);
-        }
+        userChunks.push(userIdsToFetch.slice(i, i + 10));
       }
+      await Promise.all(
+        userChunks.map(async (chunk) => {
+          try {
+            const uSnap = await firestore
+              .collection("users")
+              .where(FieldPath.documentId(), "in", chunk)
+              .get();
+            uSnap.docs.forEach((uDoc) => userMap.set(uDoc.id, uDoc.data()));
+          } catch (e) {
+            console.warn("Error fetching users for orders enrichment:", e);
+          }
+        })
+      );
     }
 
-    // Pre-cargar viajes en una única consulta para evitar consultas N+1 hacia Firestore
+    // Solo consultar viajes si alguna orden no tiene tripId o si se filtró por withoutTrip
     const orderToTripMap = new Map<string, string>();
-    try {
-      const tripsSnap = await firestore.collection("trips").get();
-      tripsSnap.docs.forEach((tripDoc) => {
-        const tripData = tripDoc.data();
-        const orderIds: string[] = tripData.orderIds || [];
-        orderIds.forEach((orderId) => {
-          orderToTripMap.set(orderId, tripDoc.id);
+    const needsTripMap =
+      Boolean(parsedFilters.withoutTrip) || rawOrders.some((o) => !o.tripId);
+
+    if (needsTripMap && rawOrders.length > 0) {
+      try {
+        const tripsSnap = await firestore.collection("trips").select("orderIds").get();
+        tripsSnap.docs.forEach((tripDoc) => {
+          const tripData = tripDoc.data();
+          const orderIds: string[] = tripData.orderIds || [];
+          orderIds.forEach((orderId) => {
+            orderToTripMap.set(orderId, tripDoc.id);
+          });
         });
-      });
-    } catch (tripsBatchError) {
-      console.warn("Advertencia al precargar mapa de viajes para órdenes:", tripsBatchError);
+      } catch (tripsBatchError) {
+        console.warn("Advertencia al precargar mapa de viajes para órdenes:", tripsBatchError);
+      }
     }
 
     let ordersWithTrip = rawOrders.map((orderData) => {

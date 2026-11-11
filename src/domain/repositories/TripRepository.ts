@@ -6,6 +6,7 @@ export interface TripRepository {
   getAvailable(driverId?: string): Promise<Trip[]>;
   getById(tripId: string): Promise<Trip | null>;
   getAll(): Promise<Trip[]>;
+  getActiveTrips?(): Promise<Trip[]>;
   getDriverTripHistory(userId: string): Promise<Trip[]>;
   getDriverActualTrips(userId: string): Promise<Trip[]>;
   assignDriver(tripId: string, driverId: string): Promise<void>;

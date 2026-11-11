@@ -14,18 +14,31 @@ export class UpdateOrderStatusUseCase {
 
   private async resolveDriverId(
     requiredTons: number,
-    preferredDriverId?: string
+    preferredDriverId?: string,
+    cachedContext?: { drivers: any[]; trips: any[] }
   ): Promise<string> {
     const preferred = (preferredDriverId || "").trim();
     if (preferred) return preferred;
     if (!this.userRepo || !this.tripRepo) return "";
 
-    const [drivers, trips] = await Promise.all([
-      this.userRepo.getAll({ status: "active", userType: "driver" }),
-      this.tripRepo.getAll(),
-    ]);
+    if (!cachedContext) {
+      const [drivers, trips] = await Promise.all([
+        this.userRepo.getAll({ status: "active", userType: "driver" }),
+        this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
+      ]);
+      return selectBestDriver(drivers, trips, requiredTons) || "";
+    }
 
-    return selectBestDriver(drivers, trips, requiredTons) || "";
+    const selected = selectBestDriver(cachedContext.drivers, cachedContext.trips, requiredTons) || "";
+    if (selected) {
+      cachedContext.trips.push({
+        assignedDriverId: selected,
+        driverId: selected,
+        status: "assigned",
+        totalTons: requiredTons,
+      });
+    }
+    return selected;
   }
 
   async execute(
@@ -78,12 +91,22 @@ export class UpdateOrderStatusUseCase {
             const baseTripNumber = `TRIP-${order.orderNumber || orderId.slice(0, 6).toUpperCase()}`;
 
             if (tripsPlan && tripsPlan.length > 0) {
+              const needsAutoDriver = tripsPlan.some((p) => !(p.driverId || driverId || "").trim());
+              const driverContext =
+                needsAutoDriver && this.userRepo && this.tripRepo
+                  ? await Promise.all([
+                      this.userRepo.getAll({ status: "active", userType: "driver" }),
+                      this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
+                    ]).then(([drivers, trips]) => ({ drivers, trips: [...trips] }))
+                  : undefined;
+
               for (let i = 0; i < tripsPlan.length; i++) {
                 const plan = tripsPlan[i];
                 const tripNumber = tripsPlan.length > 1 ? `${baseTripNumber}-${i + 1}` : baseTripNumber;
                 const tripDriver = await this.resolveDriverId(
                   plan.totalTons,
-                  plan.driverId || driverId
+                  plan.driverId || driverId,
+                  driverContext
                 );
                 const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 

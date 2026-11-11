@@ -106,11 +106,11 @@ export class CreateTripUseCase {
     // candidato activo con capacidad disponible para la carga calculada.
     let resolvedDriverId = (data.driverId || "").trim();
     if (!resolvedDriverId && this.userRepo) {
-      const [drivers, allTrips] = await Promise.all([
+      const [drivers, activeTrips] = await Promise.all([
         this.userRepo.getAll({ status: "active", userType: "driver" }),
-        this.tripRepo.getAll(),
+        this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
       ]);
-      resolvedDriverId = selectBestDriver(drivers, allTrips, calculatedTotalTons) || "";
+      resolvedDriverId = selectBestDriver(drivers, activeTrips, calculatedTotalTons) || "";
     }
 
     // Si se asignó un conductor, limitar a la capacidad de su camión si es menor

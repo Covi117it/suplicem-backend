@@ -34,13 +34,20 @@ export class UpdateUserStatusUseCase {
       await this.authService?.setUserDisabled?.(uid, false);
     }
 
-    // Si el administrador aprueba una cuenta nueva por primera vez (estado cambia de 'pending' a 'active'), enviar correo con el bot
+    // Si el administrador aprueba una cuenta nueva por primera vez (estado cambia de 'pending' a 'active'), enviar correo con el bot sin bloquear la respuesta HTTP
     if (status === "active" && previousStatus === "pending") {
-      await this.botService.sendAccountApprovedEmailBot(
-        user.email,
-        user.names || "Usuario",
-        user.lastNames || ""
-      );
+      this.botService
+        .sendAccountApprovedEmailBot(
+          user.email,
+          user.names || "Usuario",
+          user.lastNames || ""
+        )
+        .catch((err) => {
+          console.warn(
+            "[UpdateUserStatusUseCase] Error al enviar correo de aprobación:",
+            err?.message || err
+          );
+        });
     }
   }
 }

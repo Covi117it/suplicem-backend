@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import { registerRoutes } from "./interfaces/http/routes";
 import { globalLimiter } from "./interfaces/http/middlewares/rateLimiter";
 import { errorHandler } from "./interfaces/http/middlewares/errorHandler";
@@ -13,6 +14,7 @@ export const startServer = () => {
   app.set("trust proxy", 1);
 
   app.use(cors());
+  app.use(compression());
 
   // Logging middleware
   app.use((req, _res, next) => {

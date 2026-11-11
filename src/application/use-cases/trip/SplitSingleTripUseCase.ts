@@ -13,18 +13,31 @@ export class SplitSingleTripUseCase {
 
   private async resolveDriverId(
     requiredTons: number,
-    preferredDriverId?: string
+    preferredDriverId?: string,
+    cachedContext?: { drivers: any[]; trips: any[] }
   ): Promise<string> {
     const preferred = (preferredDriverId || "").trim();
     if (preferred) return preferred;
     if (!this.userRepo) return "";
 
-    const [drivers, trips] = await Promise.all([
-      this.userRepo.getAll({ status: "active", userType: "driver" }),
-      this.tripRepo.getAll(),
-    ]);
+    if (!cachedContext) {
+      const [drivers, trips] = await Promise.all([
+        this.userRepo.getAll({ status: "active", userType: "driver" }),
+        this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
+      ]);
+      return selectBestDriver(drivers, trips, requiredTons) || "";
+    }
 
-    return selectBestDriver(drivers, trips, requiredTons) || "";
+    const selected = selectBestDriver(cachedContext.drivers, cachedContext.trips, requiredTons) || "";
+    if (selected) {
+      cachedContext.trips.push({
+        assignedDriverId: selected,
+        driverId: selected,
+        status: "assigned",
+        totalTons: requiredTons,
+      });
+    }
+    return selected;
   }
 
   async execute(
@@ -66,13 +79,22 @@ export class SplitSingleTripUseCase {
     }
 
     const createdTripIds: string[] = [];
+    const needsAutoDriver = subTrips.some((t) => !(t.driverId || "").trim());
+    const driverContext =
+      needsAutoDriver && this.userRepo
+        ? await Promise.all([
+            this.userRepo.getAll({ status: "active", userType: "driver" }),
+            this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
+          ]).then(([drivers, activeTrips]) => ({ drivers, trips: [...activeTrips] }))
+        : undefined;
 
     for (let i = 0; i < subTrips.length; i++) {
       const item = subTrips[i];
       const tripNumber = `${trip.tripNumber}-${String.fromCharCode(65 + i)}`;
       const resolvedDriverId = await this.resolveDriverId(
         item.totalTons,
-        item.driverId
+        item.driverId,
+        driverContext
       );
       const isAssigned = resolvedDriverId !== "";
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();

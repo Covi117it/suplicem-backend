@@ -92,3 +92,22 @@ export const UpdateUserStatusSchema = z.object({
     message: "status no válido",
   }),
 });
+
+export const GetUsersQuerySchema = z
+  .object({
+    status: z.string().trim().optional(),
+    userType: z.string().trim().optional(),
+    sellerId: z.string().trim().optional(),
+    aiRiskFlag: z
+      .union([z.boolean(), z.string()])
+      .transform((val) => {
+        if (typeof val === "boolean") return val;
+        return val.toLowerCase() === "true";
+      })
+      .optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .optional()
+  .default({});

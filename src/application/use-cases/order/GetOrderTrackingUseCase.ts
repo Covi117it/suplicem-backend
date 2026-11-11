@@ -93,41 +93,64 @@ export class GetOrderTrackingUseCase {
       }
     }
 
-    // 2. Procesar cada viaje (datos de chofer, ubicación GPS y PIN de seguridad)
-    const mappedTrips: TripTrackingItemDto[] = [];
+    // 2. Precargar datos de choferes y ubicaciones en paralelo (sin N+1 ni duplicados)
+    const missingDriverIds = new Set<string>();
+    const activeLocationDriverIds = new Set<string>();
 
     for (const t of rawTrips) {
       const driverId = t.assignedDriverId || t.driverId || t.driver?.id || t.driver?.uid;
-      let driverData = t.driver || null;
+      if (!driverId) continue;
+      if (!t.driver && this.userRepo) {
+        missingDriverIds.add(driverId);
+      }
+      if (t.status === "accepted" || t.status === "started" || t.status === "in_progress") {
+        activeLocationDriverIds.add(driverId);
+      }
+    }
 
-      if (!driverData && driverId && this.userRepo) {
+    const driverMap = new Map<string, any>();
+    const locationMap = new Map<string, { latitude: number; longitude: number; updatedAt?: string }>();
+
+    await Promise.all([
+      ...Array.from(missingDriverIds).map(async (driverId) => {
         try {
-          const userDoc = await this.userRepo.getById(driverId);
+          const userDoc = await this.userRepo?.getById(driverId);
           if (userDoc) {
-            driverData = {
+            driverMap.set(driverId, {
               id: userDoc.uid,
               names: userDoc.names,
               lastNames: userDoc.lastNames,
               phone: userDoc.phone,
               vehicle: userDoc.vehicle,
-            };
+            });
           }
         } catch {
           // Ignorar error al cargar usuario secundario
         }
-      }
-
-      let locationData: { latitude: number; longitude: number; updatedAt?: string } | null = null;
-      if (driverId && (t.status === "accepted" || t.status === "started" || t.status === "in_progress")) {
-        const loc = await this.locationRepo.get(driverId);
-        if (loc) {
-          locationData = {
-            latitude: loc.lat,
-            longitude: loc.lng,
-            updatedAt: loc.updatedAt,
-          };
+      }),
+      ...Array.from(activeLocationDriverIds).map(async (driverId) => {
+        try {
+          const loc = await this.locationRepo.get(driverId);
+          if (loc) {
+            locationMap.set(driverId, {
+              latitude: loc.lat,
+              longitude: loc.lng,
+              updatedAt: loc.updatedAt,
+            });
+          }
+        } catch {
+          // Ignorar error individual de ubicación
         }
-      }
+      }),
+    ]);
+
+    const mappedTrips: TripTrackingItemDto[] = rawTrips.map((t) => {
+      const driverId = t.assignedDriverId || t.driverId || t.driver?.id || t.driver?.uid;
+      const driverData = t.driver || (driverId ? driverMap.get(driverId) || null : null);
+      const isActiveTrip =
+        t.status === "accepted" || t.status === "started" || t.status === "in_progress";
+      const locationData =
+        driverId && isActiveTrip ? locationMap.get(driverId) || null : null;
 
       // Asegurar que cada viaje cuente con PIN único
       let tripPin = t.deliveryPin;
@@ -143,7 +166,7 @@ export class GetOrderTrackingUseCase {
 
       const showPin = (userRole === "admin" || order.userId === userId) && t.status !== "completed";
 
-      mappedTrips.push({
+      return {
         id: t.id || "",
         tripNumber: t.tripNumber,
         status: t.status,
@@ -153,8 +176,8 @@ export class GetOrderTrackingUseCase {
         deliveryPin: showPin ? tripPin : undefined,
         location: locationData,
         createdAt: t.createdAt,
-      });
-    }
+      };
+    });
 
     // Identificar el viaje principal activo para compatibilidad hacia atrás
     const activeTrip =

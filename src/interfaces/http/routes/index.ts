@@ -9,6 +9,7 @@ import { locationRoutes } from "./locationRoutes";
 import { configRoutes } from "./configRoutes";
 import { companyRoutes } from "./companyRoutes";
 import { notificationRoutes } from "./notificationRoutes";
+import { dashboardRoutes } from "./dashboardRoutes";
 
 export const registerRoutes = (): Router => {
   const router = Router();
@@ -23,6 +24,7 @@ export const registerRoutes = (): Router => {
   configRoutes(router);
   companyRoutes(router);
   notificationRoutes(router);
+  dashboardRoutes(router);
 
   return router;
 };

@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { auth, firestore } from "../../../config/firebase";
+import { auth } from "../../../config/firebase";
 import { ApplicationActor } from "../../../application/dtos/UserDtos";
+import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
+
+const userRepository = new UserFirestoreRepository();
 
 export const authenticateOptional = async (
   req: Request,
@@ -38,12 +41,7 @@ export const authenticateOptional = async (
   }
 
   try {
-    const userDoc = await firestore
-      .collection("users")
-      .doc(decodedToken.uid)
-      .get();
-    
-    const userData = userDoc.data();
+    const userData = await userRepository.getByIdStrict(decodedToken.uid);
     const rawUserType = userData?.userType || "client";
     const normalizedUserType = String(rawUserType).trim().toLowerCase() as any;
 

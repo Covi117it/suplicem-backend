@@ -1,11 +1,15 @@
 import { firestore } from "../../config/firebase";
 import { User } from "../../domain/entities/User";
 import { UserRepository, UserFilters } from "../../domain/repositories/UserRepository";
+import { TtlCache } from "../cache/TtlCache";
 
 export class UserFirestoreRepository implements UserRepository {
+  private static readonly userCache = new TtlCache<User | null>(15_000);
+
   async create(user: User): Promise<void> {
     try {
       await firestore.collection("users").doc(user.uid).set(user);
+      UserFirestoreRepository.userCache.invalidate(user.uid);
     } catch (error: any) {
       console.warn("Advertencia al guardar usuario en Firestore:", error?.message || error);
     }
@@ -14,6 +18,7 @@ export class UserFirestoreRepository implements UserRepository {
   async update(uid: string, data: Partial<User>): Promise<void> {
     try {
       await firestore.collection("users").doc(uid).update(data);
+      UserFirestoreRepository.userCache.invalidate(uid);
     } catch (error: any) {
       console.warn("Advertencia al actualizar usuario en Firestore:", error?.message || error);
     }
@@ -21,22 +26,29 @@ export class UserFirestoreRepository implements UserRepository {
 
   async getById(uid: string): Promise<User | null> {
     try {
-      if (!uid || typeof uid !== "string" || !uid.trim()) {
-        return null;
-      }
+      return await this.getByIdStrict(uid);
+    } catch (error: any) {
+      console.warn("Advertencia en Firestore getById:", error.message);
+      return null;
+    }
+  }
+
+  async getByIdStrict(uid: string): Promise<User | null> {
+    if (!uid || typeof uid !== "string" || !uid.trim()) {
+      return null;
+    }
+
+    return UserFirestoreRepository.userCache.getOrLoad(uid, async () => {
       const doc = await firestore.collection("users").doc(uid).get();
       if (!doc.exists) return null;
-      const data = doc.data() as User;
+      const data = { ...(doc.data() as User) };
       if (data.userType === "driver" && !data.driverCode) {
         data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
       } else if (data.userType === "seller" && !data.sellerCode) {
         data.sellerCode = `VEND-${doc.id.slice(0, 5).toUpperCase()}`;
       }
       return { ...data, uid: doc.id };
-    } catch (error: any) {
-      console.warn("Advertencia en Firestore getById:", error.message);
-      return null;
-    }
+    });
   }
 
   async getByPhone(phone: string): Promise<User | null> {
@@ -58,17 +70,16 @@ export class UserFirestoreRepository implements UserRepository {
         candidates.add(`+1${digits}`);
       }
 
-      for (const candidate of candidates) {
-        const snapshot = await firestore
-          .collection("users")
-          .where("phone", "==", candidate)
-          .limit(1)
-          .get();
+      const candidateList = Array.from(candidates);
+      const snapshot = await firestore
+        .collection("users")
+        .where("phone", "in", candidateList)
+        .limit(1)
+        .get();
 
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          return { ...(doc.data() as User), uid: doc.id };
-        }
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        return { ...(doc.data() as User), uid: doc.id };
       }
 
       return null;

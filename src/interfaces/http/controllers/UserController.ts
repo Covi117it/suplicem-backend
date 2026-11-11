@@ -142,7 +142,40 @@ export class UserController {
   async getAll(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
-      const { status, userType, aiRiskFlag } = req.query;
+      const q = (req as any).validatedQuery || req.query;
+      const { status, userType, aiRiskFlag, search, page, limit } = q;
+
+      const isPaginatedRequest =
+        page !== undefined || limit !== undefined || (typeof search === "string" && search.trim() !== "");
+
+      if (isPaginatedRequest) {
+        const baseFilters: any = {};
+        if (authUser?.userType === "seller") {
+          baseFilters.userType = "client";
+          baseFilters.sellerId = authUser.uid;
+        }
+        if (aiRiskFlag !== undefined) {
+          baseFilters.aiRiskFlag = String(aiRiskFlag).toLowerCase() === "true";
+        }
+        const result = await getAllUsersUseCase.executePaginated({
+          baseFilters,
+          roleFilter:
+            authUser?.userType === "seller"
+              ? "client"
+              : typeof userType === "string" && userType.trim()
+              ? userType.trim()
+              : "all",
+          statusFilter:
+            typeof status === "string" && status !== "undefined" && status.trim()
+              ? status.trim()
+              : "all",
+          search: typeof search === "string" ? search : undefined,
+          page: page !== undefined ? Number(page) : undefined,
+          limit: limit !== undefined ? Number(limit) : undefined,
+        });
+        return res.status(200).json({ success: true, ...result });
+      }
+
       const filters: any = {};
       if (typeof status === "string" && status !== "undefined" && status.trim()) {
         filters.status = status.trim();

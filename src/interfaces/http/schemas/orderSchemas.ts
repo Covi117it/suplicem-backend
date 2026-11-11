@@ -178,3 +178,23 @@ export const CompleteDeliverySchema = z
   export const AttachDeliveryProofSchema = z.object({
   comment: z.string().optional(),
 }).optional().default({});
+
+export const GetOrdersQuerySchema = z
+  .object({
+    status: z.string().trim().optional(),
+    deliveryType: z.string().trim().optional(),
+    userId: z.string().trim().optional(),
+    sellerId: z.string().trim().optional(),
+    withoutTrip: z
+      .union([z.boolean(), z.string()])
+      .transform((val) => {
+        if (typeof val === "boolean") return val;
+        return val.toLowerCase() === "true";
+      })
+      .optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .optional()
+  .default({});

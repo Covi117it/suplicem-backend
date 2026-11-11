@@ -2,13 +2,14 @@ import { Router } from "express";
 import { TripController } from "../controllers/TripController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
-import { validate } from "../middlewares/validate";
+import { validate, validateQuery } from "../middlewares/validate";
 import {
   CreateTripSchema,
   UpdateTripStatusSchema,
   AcceptTripSchema,
   AssignTripDriverSchema,
   SplitOrderTripsSchema,
+  GetTripsQuerySchema,
 } from "../schemas/tripSchemas";
 
 
@@ -95,6 +96,7 @@ export const tripRoutes = (router: Router) => {
     "/trips",
     authenticate,
     requireRole(["admin", "seller"]),
+    validateQuery(GetTripsQuerySchema),
     async (req, res) => {
       await tripController.getAll(req, res);
     }

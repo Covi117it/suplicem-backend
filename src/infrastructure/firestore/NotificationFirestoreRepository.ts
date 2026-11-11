@@ -92,13 +92,14 @@ export class NotificationFirestoreRepository implements NotificationRepository {
 
   async getUnreadCount(recipientId: string): Promise<number> {
     try {
-      const snapshot = await firestore
+      const countSnap = await firestore
         .collection(COLLECTION)
         .where("recipientId", "==", recipientId)
         .where("isRead", "==", false)
+        .count()
         .get();
 
-      return snapshot.size;
+      return countSnap.data().count;
     } catch (error: any) {
       console.warn("[NotificationRepo] Error en getUnreadCount:", error?.message || error);
       return 0;

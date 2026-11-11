@@ -1,6 +1,27 @@
 import { User } from "../../../domain/entities/User";
 import { UserRepository, UserFilters } from "../../../domain/repositories/UserRepository";
 
+export interface PaginatedUsersQuery {
+  baseFilters?: UserFilters;
+  roleFilter?: string;
+  statusFilter?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedUsersResult {
+  users: User[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  roleCounts: Record<string, number>;
+  statusCounts: Record<string, number>;
+}
+
 export class GetAllUsersUseCase {
   constructor(private userRepo: UserRepository) {}
 
@@ -57,5 +78,106 @@ export class GetAllUsersUseCase {
       }
       return u;
     });
+  }
+
+  async executePaginated(query: PaginatedUsersQuery): Promise<PaginatedUsersResult> {
+    const allUsers = await this.execute(query.baseFilters);
+    const roleFilter = (query.roleFilter || "all").toLowerCase();
+    const statusFilter = (query.statusFilter || "all").toLowerCase();
+    const search = (query.search || "").trim().toLowerCase();
+
+    const relevantForRoles =
+      statusFilter === "all"
+        ? allUsers
+        : allUsers.filter((u) => {
+            const st = u.status?.toLowerCase();
+            if (statusFilter === "active") return st === "active";
+            if (statusFilter === "inactive") return st === "inactive" || st === "pending";
+            return st === statusFilter;
+          });
+
+    const roleCounts: Record<string, number> = {
+      all: relevantForRoles.length,
+      client: 0,
+      seller: 0,
+      driver: 0,
+      admin: 0,
+    };
+    relevantForRoles.forEach((u) => {
+      const role = u.userType?.toLowerCase();
+      if (role && roleCounts[role] !== undefined) {
+        roleCounts[role]++;
+      }
+    });
+
+    const relevantForStatus =
+      roleFilter === "all"
+        ? allUsers
+        : allUsers.filter((u) => u.userType?.toLowerCase() === roleFilter);
+
+    const statusCounts: Record<string, number> = {
+      all: relevantForStatus.length,
+      active: 0,
+      inactive: 0,
+    };
+    relevantForStatus.forEach((u) => {
+      const st = u.status?.toLowerCase();
+      if (st === "active") statusCounts.active++;
+      else if (st === "inactive" || st === "pending") statusCounts.inactive++;
+    });
+
+    const filtered = allUsers.filter((user) => {
+      if (roleFilter !== "all" && user.userType?.toLowerCase() !== roleFilter) {
+        return false;
+      }
+
+      const st = user.status?.toLowerCase();
+      if (statusFilter === "active" && st !== "active") {
+        return false;
+      }
+      if (statusFilter === "inactive" && st !== "inactive" && st !== "pending") {
+        return false;
+      }
+      if (
+        statusFilter !== "all" &&
+        statusFilter !== "active" &&
+        statusFilter !== "inactive" &&
+        st !== statusFilter
+      ) {
+        return false;
+      }
+
+      if (!search) return true;
+      const fullName = `${user.names || ""} ${user.lastNames || ""}`.toLowerCase();
+      return (
+        fullName.includes(search) ||
+        (user.email || "").toLowerCase().includes(search) ||
+        (user.phone || "").toLowerCase().includes(search) ||
+        (user.identification || "").toLowerCase().includes(search) ||
+        (user.driverCode || "").toLowerCase().includes(search) ||
+        (user.sellerCode || "").toLowerCase().includes(search) ||
+        (user.sellerName || "").toLowerCase().includes(search) ||
+        (user.vehicle?.plateNumber || "").toLowerCase().includes(search)
+      );
+    });
+
+    const limit = query.limit || 20;
+    const page = query.page || 1;
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * limit;
+
+    return {
+      users: filtered.slice(start, start + limit),
+      pagination: {
+        page: safePage,
+        limit,
+        total,
+        totalPages,
+      },
+      roleCounts,
+      statusCounts,
+    };
   }
 }

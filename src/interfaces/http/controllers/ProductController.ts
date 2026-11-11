@@ -6,10 +6,12 @@ import { GetAllProductsUseCase } from "../../../application/use-cases/product/Ge
 import { SearchProductsUseCase } from "../../../application/use-cases/product/SearchProductsUseCase";
 import { UpdateProductUseCase } from "../../../application/use-cases/product/UpdateProductUseCase";
 import { DeleteProductUseCase } from "../../../application/use-cases/product/DeleteProductUseCase";
+import { GetProductByIdUseCase } from "../../../application/use-cases/product/GetProductByIdUseCase";
 
 const defaultRepo = new ProductFirestoreRepository();
 const defaultCreateUseCase = new CreateProductUseCase(defaultRepo);
 const defaultGetAllUseCase = new GetAllProductsUseCase(defaultRepo);
+const defaultGetByIdUseCase = new GetProductByIdUseCase(defaultRepo);
 const defaultSearchUseCase = new SearchProductsUseCase(defaultRepo);
 const defaultUpdateUseCase = new UpdateProductUseCase(defaultRepo);
 const defaultDeleteUseCase = new DeleteProductUseCase(defaultRepo);
@@ -20,7 +22,8 @@ export class ProductController {
     private getAllProductsUseCase: GetAllProductsUseCase = defaultGetAllUseCase,
     private searchProductsUseCase: SearchProductsUseCase = defaultSearchUseCase,
     private updateProductUseCase: UpdateProductUseCase = defaultUpdateUseCase,
-    private deleteProductUseCase: DeleteProductUseCase = defaultDeleteUseCase
+    private deleteProductUseCase: DeleteProductUseCase = defaultDeleteUseCase,
+    private getProductByIdUseCase: GetProductByIdUseCase = defaultGetByIdUseCase
   ) {}
 
     async create(req: Request, res: Response) {
@@ -71,6 +74,28 @@ export class ProductController {
       res.status(500).json({
         success: false,
         message: error.message || "Error al obtener los productos",
+      });
+    }
+  }
+
+  async getById(req: Request, res: Response): Promise<void> {
+    try {
+      const product = await this.getProductByIdUseCase.execute(req.params.id);
+      if (!product) {
+        res.status(404).json({
+          success: false,
+          message: "Producto no encontrado",
+        });
+        return;
+      }
+      res.status(200).json({
+        success: true,
+        product,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error al obtener el producto",
       });
     }
   }

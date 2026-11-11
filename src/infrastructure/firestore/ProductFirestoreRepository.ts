@@ -1,6 +1,7 @@
 import { firestore } from "../../config/firebase";
 import { Product } from "../../domain/entities/Product";
 import { ProductRepository } from "../../domain/repositories/ProductRepository";
+import { TtlCache } from "../cache/TtlCache";
 
 const LOCAL_PRODUCT_IMAGE_URL =
   process.env.FIREBASE_STORAGE_EMULATOR_HOST
@@ -64,6 +65,8 @@ const INITIAL_PRODUCTS: Product[] = DEFAULT_PRODUCTS.map((p, index) => ({
 }));
 
 export class ProductFirestoreRepository implements ProductRepository {
+  private static readonly productsCache = new TtlCache<Product[]>(60_000);
+  private static readonly productByIdCache = new TtlCache<Product | null>(60_000);
   private inMemoryProducts: Product[] = [...INITIAL_PRODUCTS];
 
   async create(product: Product): Promise<string> {
@@ -71,81 +74,86 @@ export class ProductFirestoreRepository implements ProductRepository {
       const docRef = await firestore.collection("products").add(product);
       const newProduct = { ...product, id: docRef.id };
       this.inMemoryProducts.push(newProduct);
+      ProductFirestoreRepository.productsCache.invalidate();
+      ProductFirestoreRepository.productByIdCache.invalidate(docRef.id);
       return docRef.id;
     } catch (error: any) {
       console.warn("Advertencia al crear producto en Firestore:", error?.message || error);
       const fakeId = `prod-${Date.now()}`;
       this.inMemoryProducts.push({ ...product, id: fakeId });
+      ProductFirestoreRepository.productsCache.invalidate();
       return fakeId;
     }
   }
 
   async getAll(): Promise<Product[]> {
     try {
-      const snapshot = await firestore.collection("products").get();
+      return await ProductFirestoreRepository.productsCache.getOrLoad("all", async () => {
+        const snapshot = await firestore.collection("products").get();
 
-      if (snapshot.empty) {
-        console.log("⚠️ Colección 'products' vacía en Firestore. Usando productos por defecto...");
-        const seededProducts: Product[] = [];
-        for (const defaultProd of DEFAULT_PRODUCTS) {
-          try {
-            const docRef = await firestore.collection("products").add(defaultProd);
-            seededProducts.push({ id: docRef.id, ...defaultProd });
-          } catch (err) {
-            // Ignorar errores de escritura individuales
+        if (snapshot.empty) {
+          console.log("⚠️ Colección 'products' vacía en Firestore. Usando productos por defecto...");
+          const seededProducts: Product[] = [];
+          for (const defaultProd of DEFAULT_PRODUCTS) {
+            try {
+              const docRef = await firestore.collection("products").add(defaultProd);
+              seededProducts.push({ id: docRef.id, ...defaultProd });
+            } catch (err) {
+              // Ignorar errores de escritura individuales
+            }
           }
+          if (seededProducts.length > 0) {
+            this.inMemoryProducts = seededProducts;
+          }
+          return this.inMemoryProducts;
         }
-        if (seededProducts.length > 0) {
-          this.inMemoryProducts = seededProducts;
-        }
-        return this.inMemoryProducts;
-      }
 
-      const productsFromDb = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        const unit = data.unit || data.unidad || "fundas";
-        const name = data.name || data.nombre || data.title || "";
-        const price = Number(data.price || data.precio || 0);
-        const isCement = unit === "fundas" || name.toLowerCase().includes("cemento");
-        const lotSize = Number(data.lotSize || (isCement ? 500 : 0)) || undefined;
-        const defaultLotPrices: Record<string, number> | undefined = isCement
-          ? Array.from({ length: 20 }, (_, i) => (i + 1) * 50).reduce((acc, l) => {
-              acc[String(l)] = Number(
-                (data.lotPrices?.[String(l)] ?? price * l).toFixed(2)
-              );
-              return acc;
-            }, {} as Record<string, number>)
-          : data.lotPrices;
-        const lotPrice =
-          data.lotPrice !== undefined
-            ? Number(data.lotPrice)
-            : lotSize && defaultLotPrices?.[String(lotSize)]
-            ? defaultLotPrices[String(lotSize)]
-            : lotSize
-            ? Number((price * lotSize).toFixed(2))
-            : undefined;
-        return {
-          id: doc.id,
-          ...data,
-          name,
-          unit,
-          price,
-          lotSize,
-          lotPrice,
-          lotPrices: defaultLotPrices,
-          manualLotPrices: data.manualLotPrices || undefined,
-          imageUrl:
-            !data.imageUrl ||
-            data.imageUrl.includes("enfoco.com.do") ||
-            data.imageUrl.startsWith("blob:")
-              ? LOCAL_PRODUCT_IMAGE_URL
-              : data.imageUrl,
-          createdAt: data.createdAt || new Date().toISOString(),
-        };
-      }) as Product[];
+        const productsFromDb = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          const unit = data.unit || data.unidad || "fundas";
+          const name = data.name || data.nombre || data.title || "";
+          const price = Number(data.price || data.precio || 0);
+          const isCement = unit === "fundas" || name.toLowerCase().includes("cemento");
+          const lotSize = Number(data.lotSize || (isCement ? 500 : 0)) || undefined;
+          const defaultLotPrices: Record<string, number> | undefined = isCement
+            ? Array.from({ length: 20 }, (_, i) => (i + 1) * 50).reduce((acc, l) => {
+                acc[String(l)] = Number(
+                  (data.lotPrices?.[String(l)] ?? price * l).toFixed(2)
+                );
+                return acc;
+              }, {} as Record<string, number>)
+            : data.lotPrices;
+          const lotPrice =
+            data.lotPrice !== undefined
+              ? Number(data.lotPrice)
+              : lotSize && defaultLotPrices?.[String(lotSize)]
+              ? defaultLotPrices[String(lotSize)]
+              : lotSize
+              ? Number((price * lotSize).toFixed(2))
+              : undefined;
+          return {
+            id: doc.id,
+            ...data,
+            name,
+            unit,
+            price,
+            lotSize,
+            lotPrice,
+            lotPrices: defaultLotPrices,
+            manualLotPrices: data.manualLotPrices || undefined,
+            imageUrl:
+              !data.imageUrl ||
+              data.imageUrl.includes("enfoco.com.do") ||
+              data.imageUrl.startsWith("blob:")
+                ? LOCAL_PRODUCT_IMAGE_URL
+                : data.imageUrl,
+            createdAt: data.createdAt || new Date().toISOString(),
+          };
+        }) as Product[];
 
-      this.inMemoryProducts = productsFromDb;
-      return productsFromDb;
+        this.inMemoryProducts = productsFromDb;
+        return productsFromDb;
+      });
     } catch (error: any) {
       console.warn("Advertencia en Firestore Product.getAll:", error.message, "- retornando productos locales");
       return this.inMemoryProducts;
@@ -179,12 +187,14 @@ export class ProductFirestoreRepository implements ProductRepository {
 
   async findById(id: string): Promise<Product | null> {
     try {
-      const doc = await firestore.collection("products").doc(id).get();
-      if (!doc.exists) return null;
-      return {
-        id: doc.id,
-        ...doc.data(),
-      } as Product;
+      return await ProductFirestoreRepository.productByIdCache.getOrLoad(id, async () => {
+        const doc = await firestore.collection("products").doc(id).get();
+        if (!doc.exists) return null;
+        return {
+          id: doc.id,
+          ...doc.data(),
+        } as Product;
+      });
     } catch (error: any) {
       console.warn("Advertencia en Firestore Product.findById:", error.message);
       return null;
@@ -197,6 +207,8 @@ export class ProductFirestoreRepository implements ProductRepository {
     } catch (error: any) {
       console.warn("Advertencia al actualizar producto en Firestore:", error?.message || error);
     }
+    ProductFirestoreRepository.productsCache.invalidate();
+    ProductFirestoreRepository.productByIdCache.invalidate(id);
     const idx = this.inMemoryProducts.findIndex((p) => p.id === id);
     if (idx !== -1) {
       this.inMemoryProducts[idx] = { ...this.inMemoryProducts[idx], ...productData };
@@ -209,6 +221,8 @@ export class ProductFirestoreRepository implements ProductRepository {
     } catch (error: any) {
       console.warn("Advertencia al eliminar producto en Firestore:", error?.message || error);
     }
+    ProductFirestoreRepository.productsCache.invalidate();
+    ProductFirestoreRepository.productByIdCache.invalidate(id);
     this.inMemoryProducts = this.inMemoryProducts.filter((p) => p.id !== id);
   }
 }

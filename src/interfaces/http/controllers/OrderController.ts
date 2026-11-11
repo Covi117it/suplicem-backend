@@ -155,15 +155,41 @@ export class OrderController {
    async getAll(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
-      const { status, deliveryType, userId, withoutTrip } = req.query;
+      const q = (req as any).validatedQuery || req.query;
+      const { status, deliveryType, userId, sellerId, withoutTrip, search, page, limit } = q;
+
+      const effectiveSellerId =
+        authUser?.userType === "seller"
+          ? authUser.uid
+          : typeof sellerId === "string" && sellerId.trim()
+          ? sellerId.trim()
+          : undefined;
+
+      const isPaginatedRequest =
+        page !== undefined || limit !== undefined || (typeof search === "string" && search.trim() !== "");
+
+      if (isPaginatedRequest) {
+        const result = await this.getAllOrdersUseCase.executePaginated({
+          status: typeof status === "string" ? status : undefined,
+          deliveryType: typeof deliveryType === "string" ? deliveryType : undefined,
+          userId: typeof userId === "string" ? userId : undefined,
+          withoutTrip: withoutTrip !== undefined ? Boolean(withoutTrip) : undefined,
+          sellerId: effectiveSellerId,
+          search: typeof search === "string" ? search : undefined,
+          page: page !== undefined ? Number(page) : undefined,
+          limit: limit !== undefined ? Number(limit) : undefined,
+        });
+        return res.status(200).json({ success: true, ...result });
+      }
+
       const filters: any = {};
       if (typeof status === "string" && status.trim()) filters.status = status.trim();
       if (typeof deliveryType === "string" && deliveryType.trim()) filters.deliveryType = deliveryType.trim();
       if (typeof userId === "string" && userId.trim()) filters.userId = userId.trim();
       if (withoutTrip !== undefined) filters.withoutTrip = String(withoutTrip).toLowerCase() === "true";
 
-      if (authUser?.userType === "seller") {
-        filters.sellerId = authUser.uid;
+      if (effectiveSellerId) {
+        filters.sellerId = effectiveSellerId;
       }
 
       const orders = await this.getAllOrdersUseCase.execute(filters);

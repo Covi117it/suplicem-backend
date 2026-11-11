@@ -16,6 +16,7 @@ export const productRoutes = (router: Router) => {
   const productController = new ProductController();
 
   router.get("/products/search", (req, res) => productController.search(req, res));
+  router.get("/products/:id", authenticate, (req, res) => productController.getById(req, res));
   router.get("/products", authenticate, (req, res) => {
     if (req.query.search !== undefined) {
       return productController.search(req, res);

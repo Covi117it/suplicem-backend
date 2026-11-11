@@ -7,11 +7,16 @@ export class GetTripByOrderIdUseCase {
     trip: any | null;
     trips: any[];
   }> {
-    const singleTrip = await this.tripRepo.getTripByOrderId(orderId);
     const trips = await this.tripRepo.getTripsByOrderId(orderId);
+    const activeTrip =
+      trips.find((t) =>
+        ["available", "accepted", "started", "in_progress"].includes(t.status)
+      ) ||
+      trips[0] ||
+      null;
 
     return {
-      trip: singleTrip || (trips.length > 0 ? trips[0] : null),
+      trip: activeTrip,
       trips,
     };
   }

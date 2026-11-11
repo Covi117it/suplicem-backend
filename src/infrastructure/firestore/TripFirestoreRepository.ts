@@ -117,6 +117,17 @@ export class TripFirestoreRepository implements TripRepository {
     })) as Trip[];
   }
 
+  async getActiveTrips(): Promise<Trip[]> {
+    const snapshot = await firestore
+      .collection("trips")
+      .where("status", "in", ["available", "assigned", "accepted", "started", "in_progress"])
+      .get();
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Trip[];
+  }
+
   async getById(tripId: string): Promise<Trip | null> {
     const doc = await firestore.collection("trips").doc(tripId).get();
     if (!doc.exists) return null;
