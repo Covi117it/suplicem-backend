@@ -143,7 +143,7 @@ export class UserController {
     try {
       const authUser = (req as any).user;
       const q = (req as any).validatedQuery || req.query;
-      const { status, userType, aiRiskFlag, search, page, limit } = q;
+      const { status, userType, sellerId, aiRiskFlag, search, page, limit } = q;
 
       const isPaginatedRequest =
         page !== undefined || limit !== undefined || (typeof search === "string" && search.trim() !== "");
@@ -153,6 +153,8 @@ export class UserController {
         if (authUser?.userType === "seller") {
           baseFilters.userType = "client";
           baseFilters.sellerId = authUser.uid;
+        } else if (typeof sellerId === "string" && sellerId.trim()) {
+          baseFilters.sellerId = sellerId.trim();
         }
         if (aiRiskFlag !== undefined) {
           baseFilters.aiRiskFlag = String(aiRiskFlag).toLowerCase() === "true";
@@ -188,6 +190,8 @@ export class UserController {
       if (authUser?.userType === "seller") {
         filters.userType = "client";
         filters.sellerId = authUser.uid;
+      } else if (typeof sellerId === "string" && sellerId.trim()) {
+        filters.sellerId = sellerId.trim();
       }
       if (aiRiskFlag !== undefined) {
         filters.aiRiskFlag = String(aiRiskFlag).toLowerCase() === "true";
