@@ -12,7 +12,16 @@ export class UpdateUserStatusUseCase {
   ) {}
 
   async execute({ uid, status }: UpdateUserStatusDto, requesterUid?: string): Promise<void> {
-    if (requesterUid && requesterUid === uid && (status === "inactive" || status === "banned")) {
+    if (!requesterUid) {
+      throw new Error("No tienes permiso para cambiar el estado de un usuario");
+    }
+
+    const requester = await this.userRepo.getById(requesterUid);
+    if (!requester || requester.userType !== "admin" || requester.status !== "active") {
+      throw new Error("No tienes permiso para cambiar el estado de un usuario");
+    }
+
+    if (requesterUid === uid && (status === "inactive" || status === "banned")) {
       throw new Error("No puedes desactivar o suspender tu propia cuenta de administrador");
     }
 

@@ -71,7 +71,9 @@ export class UserController {
       res.status(200).json({ success: true, message: "Estado actualizado correctamente" });
     } catch (error: any) {
       console.error(error);
-      const isForbidden = error.message?.includes("No puedes desactivar");
+      const isForbidden =
+        error.message?.includes("No puedes desactivar") ||
+        error.message?.includes("No tienes permiso");
       res.status(isForbidden ? 403 : 400).json({ success: false, message: error.message });
     }
   }
