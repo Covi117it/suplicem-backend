@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { NotificationController } from "../controllers/NotificationController";
 import { authenticate } from "../middlewares/authenticate";
-import { validate } from "../middlewares/validate";
+import { validate, validateParams } from "../middlewares/validate";
 import {
   MarkNotificationAsReadSchema,
   GetNotificationsQuerySchema,
@@ -22,7 +22,7 @@ export const notificationRoutes = (router: Router) => {
   router.patch(
     "/notifications/:id/read",
     authenticate,
-    validate(MarkNotificationAsReadSchema),
+    validateParams(MarkNotificationAsReadSchema),
     (req, res) => controller.markAsRead(req, res)
   );
 
