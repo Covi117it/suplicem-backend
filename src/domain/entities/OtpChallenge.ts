@@ -1,3 +1,5 @@
+export type OtpPurpose = "login" | "register";
+
 export interface OtpChallenge {
   phone: string;
   uid: string;
@@ -5,4 +7,5 @@ export interface OtpChallenge {
   attempts: number;
   expiresAt: string;
   createdAt: string;
+  purpose?: OtpPurpose;
 }

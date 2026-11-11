@@ -11,6 +11,7 @@ import { OtpFirestoreRepository } from "../../../infrastructure/firestore/OtpFir
 import { TwilioSmsService } from "../../../infrastructure/services/TwilioSmsService";
 import { RequestOtpUseCase } from "../../../application/use-cases/auth/RequestOtpUseCase";
 import { VerifyOtpUseCase } from "../../../application/use-cases/auth/VerifyOtpUseCase";
+import { RegisterWithPhoneUseCase } from "../../../application/use-cases/auth/RegisterWithPhoneUseCase";
 
 const authService = new FirebaseAuthService();
 const userRepo = new UserFirestoreRepository();
@@ -26,7 +27,12 @@ export class AuthController {
     private getCurrentUserUseCase = new GetCurrentUserUseCase(userRepo),
     private resendVerificationUseCase = new ResendVerificationUseCase(authService, botService),
     private requestOtpUseCase = new RequestOtpUseCase(userRepo, otpRepo, smsService),
-    private verifyOtpUseCase = new VerifyOtpUseCase(otpRepo, userRepo, authService)
+    private verifyOtpUseCase = new VerifyOtpUseCase(otpRepo, userRepo, authService),
+    private registerWithPhoneUseCase = new RegisterWithPhoneUseCase(
+      otpRepo,
+      userRepo,
+      authService
+    )
   ) {}
 
   async login(req: Request, res: Response) {
@@ -60,14 +66,27 @@ export class AuthController {
 
   async requestOtp(req: Request, res: Response) {
     try {
-      const { phone } = req.body;
-      const result = await this.requestOtpUseCase.execute(phone);
+      const { phone, purpose } = req.body;
+      const result = await this.requestOtpUseCase.execute(phone, purpose);
       res.status(200).json(result);
     } catch (error: any) {
       res.status(error.statusCode || 500).json({
         success: false,
         code: error.code,
         message: error.message || "No se pudo enviar el código de verificación",
+      });
+    }
+  }
+
+  async registerWithPhone(req: Request, res: Response) {
+    try {
+      const result = await this.registerWithPhoneUseCase.execute(req.body);
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(error.statusCode || 400).json({
+        success: false,
+        code: error.code,
+        message: error.message || "No se pudo completar el registro por teléfono",
       });
     }
   }
