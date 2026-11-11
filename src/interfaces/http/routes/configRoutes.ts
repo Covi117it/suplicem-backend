@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { BankAccountController } from "../controllers/ConfigController";
+import { SupportConfigController } from "../controllers/SupportConfigController";
 import { authenticate } from "../middlewares/authenticate";
 import { requireRole } from "../middlewares/authorize";
 import { validate } from "../middlewares/validate";
@@ -7,10 +8,28 @@ import {
   CreateBankAccountSchema,
   UpdateBankAccountSchema,
 } from "../schemas/bankAccountSchemas";
+import { UpdateSupportConfigSchema } from "../schemas/supportConfigSchemas";
 
 export const configRoutes = (router: Router) => {
   const bankAccountController = new BankAccountController();
+  const supportConfigController = new SupportConfigController();
 
+  // ─── SOPORTE Y ASISTENCIA ─────────────────────────────────────────────
+  // GET /config/support         — Consulta la configuración de soporte (usuarios autenticados)
+  router.get("/config/support", authenticate, (req, res) =>
+    supportConfigController.get(req, res)
+  );
+
+  // PUT /config/support         — Actualiza la configuración de soporte (solo admin)
+  router.put(
+    "/config/support",
+    authenticate,
+    requireRole(["admin"]),
+    validate(UpdateSupportConfigSchema),
+    (req, res) => supportConfigController.update(req, res)
+  );
+
+  // ─── CUENTAS BANCARIAS ────────────────────────────────────────────────
   // GET  /bank-accounts        — Lista todas las cuentas (admin + legacy /config/bank-accounts)
   router.get("/bank-accounts", authenticate, (req, res) =>
     bankAccountController.getAll(req, res)
