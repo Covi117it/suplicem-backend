@@ -1,9 +1,13 @@
 import { User } from "../../../domain/entities/User";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { ApplicationActor } from "../../dtos/UserDtos";
+import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
 
 export class UpdateUserUseCase {
-  constructor(private userRepo: UserRepository) {}
+  constructor(
+    private userRepo: UserRepository,
+    private notificationDispatcher?: NotificationDispatcherService
+  ) {}
 
   async execute(
     userToUpdate: Partial<User> & { uid: string },
@@ -52,5 +56,31 @@ export class UpdateUserUseCase {
       userType: existingUser.userType, // Inmutable vía perfil
       status: existingUser.status, // Inmutable vía perfil
     });
+
+    const newSellerId = sanitizedUpdate.sellerId;
+    const sellerChanged = !!newSellerId && newSellerId !== existingUser.sellerId;
+    if (this.notificationDispatcher && isAuthorizedAdmin && sellerChanged && existingUser.userType === "client") {
+      const clientName =
+        existingUser.companyName ||
+        `${sanitizedUpdate.names ?? existingUser.names} ${sanitizedUpdate.lastNames ?? existingUser.lastNames}`.trim() ||
+        "Cliente";
+
+      this.userRepo
+        .getById(requester.uid)
+        .then((admin) => {
+          const adminName = admin
+            ? `${admin.names || ""} ${admin.lastNames || ""}`.trim() || "Administración"
+            : "Administración";
+
+          return this.notificationDispatcher!.notifyClientAssigned({
+            sellerId: newSellerId,
+            adminName,
+            clientName,
+          });
+        })
+        .catch((err) =>
+          console.warn("[Notification] Error al notificar asignación de cliente:", err?.message || err)
+        );
+    }
   }
 }

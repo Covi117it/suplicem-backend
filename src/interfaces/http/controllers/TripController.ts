@@ -17,10 +17,14 @@ import { AssignTripDriverUseCase } from "../../../application/use-cases/trip/Ass
 import { SplitOrderTripsUseCase } from "../../../application/use-cases/trip/SplitOrderTripsUseCase";
 import { SplitSingleTripUseCase } from "../../../application/use-cases/trip/SplitSingleTripUseCase";
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
+import { NotificationFirestoreRepository } from "../../../infrastructure/firestore/NotificationFirestoreRepository";
+import { NotificationDispatcherService } from "../../../application/services/NotificationDispatcherService";
 
 const tripRepo = new TripFirestoreRepository();
 const orderRepo = new OrderFirestoreRepository();
 const userRepo = new UserFirestoreRepository();
+const notificationRepo = new NotificationFirestoreRepository();
+const notificationDispatcher = new NotificationDispatcherService(notificationRepo);
 
 export class TripController {
   constructor(
@@ -33,7 +37,7 @@ export class TripController {
     private getTripDetailsUseCase = new GetTripDetailsUseCase(tripRepo),
     private getTripByOrderIdUseCase = new GetTripByOrderIdUseCase(tripRepo),
     private updateTripStatusUseCase = new UpdateTripStatusUseCase(tripRepo),
-    private completeTripUseCase = new CompleteTripUseCase(tripRepo),
+    private completeTripUseCase = new CompleteTripUseCase(tripRepo, orderRepo, userRepo, notificationDispatcher),
     private getTripByIdUseCase = new GetTripByIdUseCase(tripRepo),
     private getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo),
     private assignTripDriverUseCase = new AssignTripDriverUseCase(tripRepo, userRepo),

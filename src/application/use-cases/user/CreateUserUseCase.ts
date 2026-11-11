@@ -7,6 +7,7 @@ import { RegistrationBotService } from "../../../infrastructure/services/Registr
 import { SynthIDDetectorService } from "../../../infrastructure/services/SynthIDDetectorService";
 import { ApplicationActor, CreateUserDto } from "../../dtos/UserDtos";
 import { uploadIdentificationImage, deleteStorageFile } from "../../../domain/services/ImageStorageService";
+import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
 
 export class CreateUserUseCase {
   private botService = new RegistrationBotService();
@@ -14,7 +15,8 @@ export class CreateUserUseCase {
 
   constructor(
     private userRepo: UserRepository,
-    private authService: AuthService
+    private authService: AuthService,
+    private notificationDispatcher?: NotificationDispatcherService
   ) {}
 
  async execute(data: CreateUserDto, file?: Express.Multer.File,  requester?: ApplicationActor): Promise<any> {
@@ -201,6 +203,30 @@ export class CreateUserUseCase {
 
       // 3. Guardar en Firestore
       await this.userRepo.create(userToSave);
+
+      if (this.notificationDispatcher && isAuthorizedAdmin && userType === "client" && userToSave.sellerId) {
+        const clientName =
+          userToSave.companyName ||
+          `${userToSave.names || ""} ${userToSave.lastNames || ""}`.trim() ||
+          "Cliente";
+
+        this.userRepo
+          .getById(requester!.uid)
+          .then((admin) => {
+            const adminName = admin
+              ? `${admin.names || ""} ${admin.lastNames || ""}`.trim() || "Administración"
+              : "Administración";
+
+            return this.notificationDispatcher!.notifyClientAssigned({
+              sellerId: userToSave.sellerId,
+              adminName,
+              clientName,
+            });
+          })
+          .catch((err) =>
+            console.warn("[Notification] Error al notificar cliente creado y asignado:", err?.message || err)
+          );
+      }
 
       // 4. Despachar correo de bienvenida en segundo plano
       if (isAuthorizedAdmin) {

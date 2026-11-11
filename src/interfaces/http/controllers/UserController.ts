@@ -13,14 +13,18 @@ import { VerifyCedulaUseCase } from "../../../application/use-cases/identity/Ver
 import { DgiiLookupService } from "../../../infrastructure/services/DgiiLookupService";
 import { RncCacheFirestoreRepository } from "../../../infrastructure/firestore/RncCacheFirestoreRepository";
 import { VerifyRncUseCase } from "../../../application/use-cases/identity/VerifyRncUseCase";
+import { NotificationFirestoreRepository } from "../../../infrastructure/firestore/NotificationFirestoreRepository";
+import { NotificationDispatcherService } from "../../../application/services/NotificationDispatcherService";
 
 const userRepo = new UserFirestoreRepository();
 const authService = new FirebaseAuthService();
-const createUserUseCase = new CreateUserUseCase(userRepo, authService);
+const notificationRepo = new NotificationFirestoreRepository();
+const notificationDispatcher = new NotificationDispatcherService(notificationRepo);
+const createUserUseCase = new CreateUserUseCase(userRepo, authService, notificationDispatcher);
 const getAllUsersUseCase = new GetAllUsersUseCase(userRepo);
 const getUserByIdUseCase = new GetUserByIdUseCase(userRepo);
 const updateUserStatusUseCase = new UpdateUserStatusUseCase(userRepo, authService);
-const updateUserUseCase = new UpdateUserUseCase(userRepo);
+const updateUserUseCase = new UpdateUserUseCase(userRepo, notificationDispatcher);
 const verifyCedulaUseCase = new VerifyCedulaUseCase(
   new JceIdentityService(),
   new IdentityCacheFirestoreRepository()

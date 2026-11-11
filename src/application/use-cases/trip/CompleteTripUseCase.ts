@@ -1,7 +1,15 @@
 import { TripRepository } from "../../../domain/repositories/TripRepository";
+import { OrderRepository } from "../../../domain/repositories/OrderRepository";
+import { UserRepository } from "../../../domain/repositories/UserRepository";
+import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
 
 export class CompleteTripUseCase {
-  constructor(private tripRepo: TripRepository) {}
+  constructor(
+    private tripRepo: TripRepository,
+    private orderRepo?: OrderRepository,
+    private userRepo?: UserRepository,
+    private notificationDispatcher?: NotificationDispatcherService
+  ) {}
 
   async execute(
     tripId: string,
@@ -46,5 +54,44 @@ export class CompleteTripUseCase {
     }
 
     await this.tripRepo.completeTrip(tripId);
+
+    if (this.notificationDispatcher && this.orderRepo && trip.orderIds?.length) {
+      const assignedDriverId =
+        trip.assignedDriverId ||
+        (trip as any).driverId ||
+        trip.driver?.id ||
+        trip.driver?.uid;
+
+      let driverName = trip.driver?.names
+        ? `${trip.driver.names} ${trip.driver.lastNames || ""}`.trim()
+        : "Conductor";
+
+      if (driverName === "Conductor" && assignedDriverId && this.userRepo) {
+        const driver = await this.userRepo.getById(assignedDriverId).catch(() => null);
+        if (driver) {
+          driverName = `${driver.names || ""} ${driver.lastNames || ""}`.trim() || driverName;
+        }
+      }
+
+      Promise.all(
+        trip.orderIds.map(async (orderId) => {
+          const order = await this.orderRepo!.getById(orderId);
+          const sellerId = order?.sellerId || order?.createdBySellerId;
+          if (!order || !sellerId) return;
+
+          const clientName = `${order.userNames || ""} ${order.userLastNames || ""}`.trim() || "Cliente";
+          await this.notificationDispatcher!.notifyDeliveryCompleted({
+            sellerId,
+            driverName,
+            clientName,
+            orderNumber: order.orderNumber,
+            tripNumber: trip.tripNumber,
+            details: trip.destinationAddress?.description || `Cliente: ${clientName}`,
+          });
+        })
+      ).catch((err) =>
+        console.warn("[Notification] Error al notificar entrega completada de viaje:", err?.message || err)
+      );
+    }
   }
 }

@@ -46,7 +46,7 @@ export class OrderController {
     private getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo),
     private getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo),
     private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo, userRepo, notificationDispatcher),
-    private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo, tripRepo),
+    private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo, tripRepo, userRepo, notificationDispatcher),
     private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo, tripRepo),
     private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo),
     private updateOrderReceiptUseCase = new UpdateOrderReceiptUseCase(orderRepo)

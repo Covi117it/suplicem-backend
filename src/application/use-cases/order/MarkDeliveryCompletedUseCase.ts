@@ -1,5 +1,7 @@
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { TripRepository } from "../../../domain/repositories/TripRepository";
+import { UserRepository } from "../../../domain/repositories/UserRepository";
+import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
 
 export interface CompleteDeliveryDto {
   orderId: string;
@@ -13,7 +15,9 @@ export interface CompleteDeliveryDto {
 export class MarkDeliveryCompletedUseCase {
   constructor(
     private orderRepo: OrderRepository,
-    private tripRepo?: TripRepository
+    private tripRepo?: TripRepository,
+    private userRepo?: UserRepository,
+    private notificationDispatcher?: NotificationDispatcherService
   ) {}
 
   async execute(
@@ -58,6 +62,33 @@ export class MarkDeliveryCompletedUseCase {
       );
     } else {
       await this.orderRepo.completeDelivery(orderId, deliveryIndex, {});
+    }
+
+    if (this.notificationDispatcher) {
+      Promise.all([
+        this.orderRepo.getById(orderId),
+        userId && this.userRepo ? this.userRepo.getById(userId) : Promise.resolve(null),
+      ])
+        .then(([order, actor]) => {
+          const sellerId = order?.sellerId || order?.createdBySellerId;
+          if (!order || !sellerId) return;
+
+          const driverName = actor
+            ? `${actor.names || ""} ${actor.lastNames || ""}`.trim() || "Conductor"
+            : "Conductor";
+          const clientName = `${order.userNames || ""} ${order.userLastNames || ""}`.trim() || "Cliente";
+
+          return this.notificationDispatcher!.notifyDeliveryCompleted({
+            sellerId,
+            driverName,
+            clientName,
+            orderNumber: order.orderNumber,
+            details: `Entrega #${deliveryIndex + 1} completada`,
+          });
+        })
+        .catch((err) =>
+          console.warn("[Notification] Error al notificar entrega de orden:", err?.message || err)
+        );
     }
   }
 }
