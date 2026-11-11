@@ -4,7 +4,9 @@ import { SupportConfigRepository } from "../../../domain/repositories/SupportCon
 export class GetSupportConfigUseCase {
   constructor(private supportConfigRepo: SupportConfigRepository) {}
 
-  async execute(): Promise<SupportConfig> {
-    return this.supportConfigRepo.get();
+  async execute(): Promise<Omit<SupportConfig, "updatedBy">> {
+    const config = await this.supportConfigRepo.get();
+    const { updatedBy: _updatedBy, ...publicConfig } = config;
+    return publicConfig;
   }
 }

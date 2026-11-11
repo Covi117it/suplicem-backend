@@ -15,8 +15,8 @@ export const configRoutes = (router: Router) => {
   const supportConfigController = new SupportConfigController();
 
   // ─── SOPORTE Y ASISTENCIA ─────────────────────────────────────────────
-  // GET /config/support         — Consulta la configuración de soporte (usuarios autenticados)
-  router.get("/config/support", authenticate, (req, res) =>
+  // GET /config/support         — Consulta pública de la configuración de soporte
+  router.get("/config/support", (req, res) =>
     supportConfigController.get(req, res)
   );
 
