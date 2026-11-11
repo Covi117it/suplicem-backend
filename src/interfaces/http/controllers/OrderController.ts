@@ -16,8 +16,8 @@ import { LocationFirestoreRepository } from "../../../infrastructure/firestore/L
 import { ProductFirestoreRepository } from "../../../infrastructure/firestore/ProductFirestoreRepository";
 import { TripFirestoreRepository } from "../../../infrastructure/firestore/TripFirestoreRepository";
 import { IdempotencyFirestoreRepository } from "../../../infrastructure/firestore/IdempotencyFirestoreRepository";
-
-
+import { NotificationFirestoreRepository } from "../../../infrastructure/firestore/NotificationFirestoreRepository";
+import { NotificationDispatcherService } from "../../../application/services/NotificationDispatcherService";
 
 const tripRepo = new TripFirestoreRepository();
 const locationRepo = new LocationFirestoreRepository();
@@ -25,14 +25,27 @@ const orderRepo = new OrderFirestoreRepository();
 const userRepo = new UserFirestoreRepository();
 const productRepo = new ProductFirestoreRepository();
 const idempotencyRepo = new IdempotencyFirestoreRepository();
+const notificationRepo = new NotificationFirestoreRepository();
+const notificationDispatcher = new NotificationDispatcherService(notificationRepo);
+
 export class OrderController {
   constructor(
-    private createOrderUseCase = new CreateOrderUseCase(orderRepo, productRepo, idempotencyRepo, userRepo),
+    private createOrderUseCase = new CreateOrderUseCase(
+      orderRepo,
+      productRepo,
+      idempotencyRepo,
+      userRepo,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      notificationDispatcher
+    ),
     private getMyOrdersUseCase = new GetMyOrdersUseCase(orderRepo, userRepo),
     private getOrderTrackingUseCase = new GetOrderTrackingUseCase(orderRepo, tripRepo, locationRepo, userRepo),
     private getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepo),
     private getAllOrdersUseCase = new GetAllOrdersUseCase(orderRepo, userRepo),
-    private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo, userRepo),
+    private updateOrderStatusUseCase = new UpdateOrderStatusUseCase(orderRepo, tripRepo, userRepo, notificationDispatcher),
     private markDeliveryCompletedUseCase = new MarkDeliveryCompletedUseCase(orderRepo, tripRepo),
     private attachDeliveryProofUseCase = new AttachDeliveryProofUseCase(orderRepo, tripRepo),
     private updateOrderDeliveriesUseCase = new UpdateOrderDeliveriesUseCase(orderRepo),

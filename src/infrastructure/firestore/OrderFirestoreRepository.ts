@@ -131,41 +131,43 @@ export class OrderFirestoreRepository implements OrderRepository {
       }
     }
 
-    let ordersWithTrip = await Promise.all(
-      rawOrders.map(async (orderData) => {
-        if (orderData.userId && userMap.has(orderData.userId)) {
-          const u = userMap.get(orderData.userId);
-          orderData.userPhone = u?.phone || orderData.userPhone || "";
-          orderData.userNames = u?.names || orderData.userNames || "";
-          orderData.userLastNames = u?.lastNames || orderData.userLastNames || "";
-          orderData.userEmail = u?.email || orderData.userEmail || "";
-        }
+    // Pre-cargar viajes en una única consulta para evitar consultas N+1 hacia Firestore
+    const orderToTripMap = new Map<string, string>();
+    try {
+      const tripsSnap = await firestore.collection("trips").get();
+      tripsSnap.docs.forEach((tripDoc) => {
+        const tripData = tripDoc.data();
+        const orderIds: string[] = tripData.orderIds || [];
+        orderIds.forEach((orderId) => {
+          orderToTripMap.set(orderId, tripDoc.id);
+        });
+      });
+    } catch (tripsBatchError) {
+      console.warn("Advertencia al precargar mapa de viajes para órdenes:", tripsBatchError);
+    }
 
-        if (!orderData.deliveryAddress && orderData.deliveries && orderData.deliveries.length > 0) {
-          orderData.deliveryAddress = orderData.deliveries[0].address;
-        }
+    let ordersWithTrip = rawOrders.map((orderData) => {
+      if (orderData.userId && userMap.has(orderData.userId)) {
+        const u = userMap.get(orderData.userId);
+        orderData.userPhone = u?.phone || orderData.userPhone || "";
+        orderData.userNames = u?.names || orderData.userNames || "";
+        orderData.userLastNames = u?.lastNames || orderData.userLastNames || "";
+        orderData.userEmail = u?.email || orderData.userEmail || "";
+      }
 
-        try {
-          const tripSnap = await firestore
-            .collection("trips")
-            .where("orderIds", "array-contains", orderData.id!)
-            .limit(1)
-            .get();
+      if (!orderData.deliveryAddress && orderData.deliveries && orderData.deliveries.length > 0) {
+        orderData.deliveryAddress = orderData.deliveries[0].address;
+      }
 
-          if (!tripSnap.empty) {
-            const tripDoc = tripSnap.docs[0];
-            return {
-              ...orderData,
-              tripId: tripDoc.id,
-            };
-          }
-        } catch (tripError) {
-          console.warn(`Error al consultar trip para la orden ${orderData.id}:`, tripError);
-        }
+      if (orderData.id && orderToTripMap.has(orderData.id)) {
+        return {
+          ...orderData,
+          tripId: orderToTripMap.get(orderData.id),
+        };
+      }
 
-        return orderData;
-      })
-    );
+      return orderData;
+    });
 
     if (parsedFilters.withoutTrip) {
       ordersWithTrip = ordersWithTrip.filter((o) => !o.tripId);

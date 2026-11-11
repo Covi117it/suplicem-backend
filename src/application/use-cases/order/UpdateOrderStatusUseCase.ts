@@ -2,12 +2,14 @@ import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { selectBestDriver } from "../../../domain/services/DriverAssignmentService";
+import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
 
 export class UpdateOrderStatusUseCase {
   constructor(
     private orderRepo: OrderRepository,
     private tripRepo?: TripRepository,
-    private userRepo?: UserRepository
+    private userRepo?: UserRepository,
+    private notificationDispatcher?: NotificationDispatcherService
   ) {}
 
   private async resolveDriverId(
@@ -50,6 +52,22 @@ export class UpdateOrderStatusUseCase {
     }
 
     await this.orderRepo.updateStatus(orderId, status, reason);
+
+    if (this.notificationDispatcher && (status === "approved" || status === "rejected")) {
+      this.orderRepo.getById(orderId).then((order) => {
+        if (order && (order.sellerId || order.createdBySellerId)) {
+          const sellerId = order.sellerId || order.createdBySellerId;
+          const clientName = `${order.userNames || ""} ${order.userLastNames || ""}`.trim() || "Cliente";
+          this.notificationDispatcher?.notifyOrderStatusChanged({
+            orderNumber: order.orderNumber,
+            sellerId,
+            status,
+            reason,
+            clientName,
+          }).catch((err) => console.warn("[Notification] Error al notificar cambio de estado:", err?.message || err));
+        }
+      }).catch((err) => console.warn("[Notification] Error al consultar orden:", err?.message || err));
+    }
 
     if (status === "approved" && this.tripRepo) {
       try {

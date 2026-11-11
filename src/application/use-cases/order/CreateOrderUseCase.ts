@@ -7,6 +7,7 @@ import { SynthIDDetectorService } from "../../../infrastructure/services/SynthID
 import { TonnageCalculatorService } from "../../../domain/services/TonnageCalculatorService";
 import { OrderPricingService } from "../../../domain/services/OrderPricingService";
 import { OrderPolicyValidatorService } from "../../../domain/services/OrderPolicyValidatorService";
+import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
 import { CreateOrderDto } from "../../dtos/OrderDtos";
 
 export class CreateOrderUseCase {
@@ -18,7 +19,8 @@ export class CreateOrderUseCase {
     private synthIDDetector: SynthIDDetectorService = new SynthIDDetectorService(),
     private tonnageCalculator: TonnageCalculatorService = new TonnageCalculatorService(),
     private pricingService: OrderPricingService = new OrderPricingService(),
-    private policyValidator: OrderPolicyValidatorService = new OrderPolicyValidatorService()
+    private policyValidator: OrderPolicyValidatorService = new OrderPolicyValidatorService(),
+    private notificationDispatcher?: NotificationDispatcherService
   ) {}
 
   async execute(
@@ -141,6 +143,16 @@ export class CreateOrderUseCase {
     };
 
     const result = await this.orderRepo.create(order);
+
+    if (this.notificationDispatcher && assignedSellerId) {
+      this.notificationDispatcher.notifyOrderCreated({
+        orderNumber: result.orderNumber,
+        sellerId: assignedSellerId,
+        clientName: `${userNames} ${userLastNames}`.trim() || "Cliente",
+        totalTons: calculatedTotalTons,
+        address: resolvedDeliveryAddress?.description,
+      }).catch((err) => console.warn("[Notification] Error al notificar orden creada:", err?.message || err));
+    }
 
     // 7. Guardar resultado de la compra para futuros reintentos de red
     if (data.idempotencyKey && this.idempotencyRepo) {
