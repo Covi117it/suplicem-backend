@@ -61,6 +61,37 @@ export class UpdateOrderStatusUseCase {
         throw new Error("No se puede completar una orden cancelada o rechazada");
       }
       await this.orderRepo.updateStatus(orderId, "completed");
+
+      if (this.notificationDispatcher) {
+        Promise.resolve()
+          .then(async () => {
+            let sellerId = order.sellerId || order.createdBySellerId;
+            if (!sellerId && order.userId && this.userRepo) {
+              const client = await this.userRepo.getById(order.userId).catch(() => null);
+              sellerId = client?.sellerId;
+            }
+            if (!sellerId) return;
+
+            const clientName = `${order.userNames || ""} ${order.userLastNames || ""}`.trim() || "Cliente";
+            const isPickup = order.deliveryType === "almacen";
+
+            await this.notificationDispatcher!.notifyDeliveryCompleted({
+              sellerId,
+              driverName: isPickup ? "Almacén" : "Administración",
+              actorRole: isPickup ? "Despacho" : "Administración",
+              title: `entregó el Pedido #${order.orderNumber}`,
+              description: isPickup
+                ? `Retiro en almacén completado para ${clientName}.`
+                : `Entrega completada para ${clientName}.`,
+              clientName,
+              orderNumber: order.orderNumber,
+              details: `Cliente: ${clientName}`,
+            });
+          })
+          .catch((err) =>
+            console.warn("[Notification] Error al notificar orden completada:", err?.message || err)
+          );
+      }
       return;
     }
 

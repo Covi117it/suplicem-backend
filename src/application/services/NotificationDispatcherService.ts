@@ -76,6 +76,9 @@ export class NotificationDispatcherService {
   async notifyDeliveryCompleted(params: {
     sellerId?: string;
     driverName: string;
+    actorRole?: string;
+    title?: string;
+    description?: string;
     clientName: string;
     orderNumber: number;
     tripNumber?: string;
@@ -89,9 +92,11 @@ export class NotificationDispatcherService {
       type: "delivery_completed",
       category: "deliveries",
       actorName: params.driverName || "Conductor",
-      actorRole: "Conductor",
-      title: "completó la entrega para tu cliente",
-      description: `Entrega completada para ${params.clientName}${params.tripNumber ? ` (${params.tripNumber})` : ""}.`,
+      actorRole: params.actorRole || "Conductor",
+      title: params.title || "completó la entrega para tu cliente",
+      description:
+        params.description ||
+        `Entrega completada para ${params.clientName}${params.tripNumber ? ` (${params.tripNumber})` : ""}.`,
       isRead: false,
       createdAt: new Date().toISOString(),
       preview: {
