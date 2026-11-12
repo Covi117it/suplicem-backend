@@ -34,6 +34,7 @@ export class NotificationController {
       const { id } = req.params;
 
       await this.markNotificationAsReadUseCase.execute(id, recipientId);
+      GetMyNotificationsUseCase.invalidateCache(recipientId);
       res.status(200).json({ success: true, message: "Notificación marcada como leída" });
     } catch (error: any) {
       res.status(500).json({
@@ -48,6 +49,7 @@ export class NotificationController {
       const recipientId = (req as any).user?.uid;
 
       await this.markAllAsReadUseCase.execute(recipientId);
+      GetMyNotificationsUseCase.invalidateCache(recipientId);
       res.status(200).json({ success: true, message: "Todas las notificaciones marcadas como leídas" });
     } catch (error: any) {
       res.status(500).json({

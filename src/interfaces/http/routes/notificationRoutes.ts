@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { NotificationController } from "../controllers/NotificationController";
 import { authenticate } from "../middlewares/authenticate";
-import { validate, validateParams } from "../middlewares/validate";
+import { validate, validateParams, validateQuery } from "../middlewares/validate";
 import {
   MarkNotificationAsReadSchema,
   GetNotificationsQuerySchema,
@@ -14,7 +14,7 @@ export const notificationRoutes = (router: Router) => {
   router.get(
     "/notifications",
     authenticate,
-    validate(GetNotificationsQuerySchema),
+    validateQuery(GetNotificationsQuerySchema),
     (req, res) => controller.getMyNotifications(req, res)
   );
 

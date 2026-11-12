@@ -3,6 +3,7 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { selectBestDriver } from "../../../domain/services/DriverAssignmentService";
 import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
+import { GetDashboardSummaryUseCase } from "../dashboard/GetDashboardSummaryUseCase";
 
 export class UpdateOrderStatusUseCase {
   constructor(
@@ -224,6 +225,8 @@ export class UpdateOrderStatusUseCase {
         console.warn("No se pudo auto-crear el viaje para la orden aprobada:", tripError);
       }
     }
+
+    GetDashboardSummaryUseCase.invalidateCache();
   }
 
 }

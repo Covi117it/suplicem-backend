@@ -3,6 +3,7 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { selectBestDriver } from "../../../domain/services/DriverAssignmentService";
+import { GetDashboardSummaryUseCase } from "../dashboard/GetDashboardSummaryUseCase";
 
 export class CreateTripUseCase {
   constructor(
@@ -147,6 +148,8 @@ export class CreateTripUseCase {
       deliveryPin: generatedPin,
     };
 
-    return await this.tripRepo.createTripAtomic(newTrip, uniqueOrderIds);
+    const tripId = await this.tripRepo.createTripAtomic(newTrip, uniqueOrderIds);
+    GetDashboardSummaryUseCase.invalidateCache();
+    return tripId;
   }
 }

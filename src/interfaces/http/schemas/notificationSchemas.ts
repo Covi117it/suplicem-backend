@@ -5,9 +5,5 @@ export const MarkNotificationAsReadSchema = z.object({
 });
 
 export const GetNotificationsQuerySchema = z.object({
-  query: z
-    .object({
-      limit: z.string().optional(),
-    })
-    .optional(),
-});
+  limit: z.string().optional(),
+}).optional().default({});

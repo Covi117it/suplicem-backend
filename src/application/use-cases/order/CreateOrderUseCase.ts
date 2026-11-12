@@ -2,6 +2,7 @@ import { Order, OrderItem } from "../../../domain/entities/Order";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { ProductRepository } from "../../../domain/repositories/ProductRepository";
 import { IdempotencyRepository } from "../../../domain/repositories/IdempotencyRepository";
+import { GetDashboardSummaryUseCase } from "../dashboard/GetDashboardSummaryUseCase";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { SynthIDDetectorService } from "../../../infrastructure/services/SynthIDDetectorService";
 import { TonnageCalculatorService } from "../../../domain/services/TonnageCalculatorService";
@@ -158,6 +159,8 @@ export class CreateOrderUseCase {
     if (data.idempotencyKey && this.idempotencyRepo) {
       await this.idempotencyRepo.complete(data.idempotencyKey, data.userId, result);
     }
+
+    GetDashboardSummaryUseCase.invalidateCache();
 
     return result;
   }

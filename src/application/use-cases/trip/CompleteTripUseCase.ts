@@ -2,6 +2,7 @@ import { TripRepository } from "../../../domain/repositories/TripRepository";
 import { OrderRepository } from "../../../domain/repositories/OrderRepository";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
+import { GetDashboardSummaryUseCase } from "../dashboard/GetDashboardSummaryUseCase";
 
 export class CompleteTripUseCase {
   constructor(
@@ -93,5 +94,7 @@ export class CompleteTripUseCase {
         console.warn("[Notification] Error al notificar entrega completada de viaje:", err?.message || err)
       );
     }
+
+    GetDashboardSummaryUseCase.invalidateCache();
   }
 }

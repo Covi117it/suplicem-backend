@@ -18,9 +18,17 @@ export class DashboardController {
   async getSummary(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
+      const userType = String(authUser?.userType || "").toLowerCase();
+      const uid = authUser?.uid || "";
+
+      if (req.query.force === "true") {
+        const cacheKey = userType === "seller" ? `seller:${uid}` : "admin";
+        GetDashboardSummaryUseCase.invalidateCache(cacheKey);
+      }
+
       const summary = await this.getDashboardSummaryUseCase.execute({
-        uid: authUser?.uid || "",
-        userType: String(authUser?.userType || "").toLowerCase(),
+        uid,
+        userType,
       });
 
       res.status(200).json({
@@ -28,6 +36,7 @@ export class DashboardController {
         ...summary,
       });
     } catch (error: any) {
+      console.error("[DashboardController.getSummary] Error:", error?.message || error);
       res.status(500).json({
         success: false,
         message: error.message || "Error al obtener el resumen del dashboard",
