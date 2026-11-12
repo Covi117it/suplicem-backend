@@ -13,5 +13,5 @@ export interface CreateUserDto extends User {
 
 export interface UpdateUserStatusDto {
   uid: string;
-  status: "pending" | "active" | "inactive" | "banned";
+  status: "pending" | "active" | "inactive" | "banned" | "rejected";
 }
