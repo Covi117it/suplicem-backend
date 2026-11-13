@@ -19,12 +19,15 @@ import { SplitSingleTripUseCase } from "../../../application/use-cases/trip/Spli
 import { UserFirestoreRepository } from "../../../infrastructure/firestore/UserFirestoreRepository";
 import { NotificationFirestoreRepository } from "../../../infrastructure/firestore/NotificationFirestoreRepository";
 import { NotificationDispatcherService } from "../../../application/services/NotificationDispatcherService";
+import { GetTripDirectionsUseCase } from "../../../application/use-cases/trip/GetTripDirectionsUseCase";
+import { HttpRouteService } from "../../../infrastructure/services/HttpRouteService";
 
 const tripRepo = new TripFirestoreRepository();
 const orderRepo = new OrderFirestoreRepository();
 const userRepo = new UserFirestoreRepository();
 const notificationRepo = new NotificationFirestoreRepository();
 const notificationDispatcher = new NotificationDispatcherService(notificationRepo);
+const routeService = new HttpRouteService();
 
 export class TripController {
   constructor(
@@ -42,7 +45,8 @@ export class TripController {
     private getDriverActiveTripUseCase = new GetDriverActiveTripUseCase(tripRepo),
     private assignTripDriverUseCase = new AssignTripDriverUseCase(tripRepo, userRepo),
     private splitOrderTripsUseCase = new SplitOrderTripsUseCase(tripRepo, orderRepo, userRepo),
-    private splitSingleTripUseCase = new SplitSingleTripUseCase(tripRepo, orderRepo, userRepo)
+    private splitSingleTripUseCase = new SplitSingleTripUseCase(tripRepo, orderRepo, userRepo),
+    private getTripDirectionsUseCase = new GetTripDirectionsUseCase(routeService)
   ) {}
 
 
@@ -256,6 +260,22 @@ export class TripController {
       res.status(400).json({
         success: false,
         message: error.message || "Error al fraccionar el viaje",
+      });
+    }
+  }
+
+  async getDirections(req: Request, res: Response) {
+    try {
+      const { originLat, originLng, destLat, destLng } = req.query as any;
+      const directions = await this.getTripDirectionsUseCase.execute(
+        { latitude: Number(originLat), longitude: Number(originLng) },
+        { latitude: Number(destLat), longitude: Number(destLng) }
+      );
+      res.status(200).json({ success: true, data: directions });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Error al obtener la ruta",
       });
     }
   }

@@ -10,6 +10,7 @@ import {
   AssignTripDriverSchema,
   SplitOrderTripsSchema,
   GetTripsQuerySchema,
+  GetTripDirectionsQuerySchema,
 } from "../schemas/tripSchemas";
 
 
@@ -140,6 +141,16 @@ export const tripRoutes = (router: Router) => {
     validate(AcceptTripSchema),
     async (req, res) => {
       await tripController.accept(req, res);
+    }
+  );
+
+  // 7.1 Obtener trazado de ruta vial optimizado (Estilo Uber)
+  router.get(
+    "/trips/directions",
+    authenticate,
+    validateQuery(GetTripDirectionsQuerySchema),
+    async (req, res) => {
+      await tripController.getDirections(req, res);
     }
   );
 

@@ -91,3 +91,10 @@ export const GetTripsQuerySchema = z
   })
   .optional()
   .default({});
+
+export const GetTripDirectionsQuerySchema = z.object({
+  originLat: z.coerce.number().min(-90).max(90, "originLat debe estar entre -90 y 90"),
+  originLng: z.coerce.number().min(-180).max(180, "originLng debe estar entre -180 y 180"),
+  destLat: z.coerce.number().min(-90).max(90, "destLat debe estar entre -90 y 90"),
+  destLng: z.coerce.number().min(-180).max(180, "destLng debe estar entre -180 y 180"),
+});
