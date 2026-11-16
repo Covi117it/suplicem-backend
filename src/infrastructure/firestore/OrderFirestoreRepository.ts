@@ -20,14 +20,6 @@ export class OrderFirestoreRepository implements OrderRepository {
       .where("userId", "==", userId)
       .get();
 
-    let userDocData: any = null;
-    try {
-      const uDoc = await firestore.collection("users").doc(userId).get();
-      if (uDoc.exists) userDocData = uDoc.data();
-    } catch (e) {
-      console.warn("Error obteniendo usuario para getByUser:", e);
-    }
-
     return snapshot.docs.map((doc) => {
       const data = doc.data();
       const fallbackDeliveryAddress =
@@ -39,10 +31,10 @@ export class OrderFirestoreRepository implements OrderRepository {
         id: doc.id,
         ...data,
         deliveryAddress: fallbackDeliveryAddress,
-        userPhone: data.userPhone || userDocData?.phone || "",
-        userNames: data.userNames || userDocData?.names || "",
-        userLastNames: data.userLastNames || userDocData?.lastNames || "",
-        userEmail: data.userEmail || userDocData?.email || "",
+        userPhone: data.userPhone || "",
+        userNames: data.userNames || "",
+        userLastNames: data.userLastNames || "",
+        userEmail: data.userEmail || "",
       } as Order;
     });
   }
@@ -143,7 +135,13 @@ export class OrderFirestoreRepository implements OrderRepository {
 
     if (needsTripMap && rawOrders.length > 0) {
       try {
-        const tripsSnap = await firestore.collection("trips").select("orderIds").get();
+        // Optimización Anti-Bottleneck: Filtrar únicamente viajes activos en lugar de escanear toda la colección histórica
+        const tripsSnap = await firestore
+          .collection("trips")
+          .where("status", "in", ["available", "assigned", "started", "in_progress"])
+          .select("orderIds")
+          .get();
+
         tripsSnap.docs.forEach((tripDoc) => {
           const tripData = tripDoc.data();
           const orderIds: string[] = tripData.orderIds || [];
