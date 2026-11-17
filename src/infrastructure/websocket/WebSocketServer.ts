@@ -85,6 +85,8 @@ export class WebSocketServer {
         socket.to(`trip:${payload.tripId}`).emit("trip:location_update", {
           tripId: payload.tripId,
           driverId,
+          lat: payload.lat,
+          lng: payload.lng,
           latitude: payload.lat,
           longitude: payload.lng,
           speed: payload.speed || 0,
