@@ -10,7 +10,10 @@ export class TtlCache<T> {
   private readonly entries = new Map<string, CacheEntry<T>>();
   private readonly inFlight = new Map<string, Promise<T>>();
 
-  constructor(private readonly ttlMs: number) {}
+  constructor(
+    private readonly ttlMs: number,
+    private readonly maxEntries: number = 250
+  ) {}
 
   get(key: string): T | undefined {
     const entry = this.entries.get(key);
@@ -35,10 +38,7 @@ export class TtlCache<T> {
 
     const promise = loader()
       .then((value) => {
-        this.entries.set(key, {
-          value,
-          expiresAt: Date.now() + this.ttlMs,
-        });
+        this.set(key, value);
         return value;
       })
       .finally(() => {
@@ -50,6 +50,10 @@ export class TtlCache<T> {
   }
 
   set(key: string, value: T): void {
+    if (this.entries.size >= this.maxEntries && !this.entries.has(key)) {
+      const oldestKey = this.entries.keys().next().value;
+      if (oldestKey) this.entries.delete(oldestKey);
+    }
     this.entries.set(key, {
       value,
       expiresAt: Date.now() + this.ttlMs,

@@ -2,15 +2,25 @@ import { firestore } from "../../config/firebase";
 import { Trip } from "../../domain/entities/Trip";
 import { TripRepository } from "../../domain/repositories/TripRepository";
 import { TripQueryService } from "./TripQueryService";
+import { TtlCache } from "../cache/TtlCache";
 
 export class TripFirestoreRepository implements TripRepository {
+  private static readonly tripByIdCache = new TtlCache<Trip | null>(15_000, 200);
+  private static readonly tripsByOrderCache = new TtlCache<Trip[]>(15_000, 200);
+
+  public static invalidateCache(tripId?: string): void {
+    TripFirestoreRepository.tripByIdCache.invalidate(tripId);
+    TripFirestoreRepository.tripsByOrderCache.invalidate();
+  }
+
   async create(trip: Trip): Promise<string> {
     const docRef = await firestore.collection("trips").add(trip);
+    TripFirestoreRepository.invalidateCache();
     return docRef.id;
   }
 
   async createTripAtomic(trip: Trip, orderIds: string[]): Promise<string> {
-    return await firestore.runTransaction(async (transaction) => {
+    const tripId = await firestore.runTransaction(async (transaction) => {
       const orderRefs = orderIds.map((id) => firestore.collection("orders").doc(id));
       const orderSnaps = await Promise.all(orderRefs.map((ref) => transaction.get(ref)));
 
@@ -73,6 +83,9 @@ export class TripFirestoreRepository implements TripRepository {
 
       return tripRef.id;
     });
+
+    TripFirestoreRepository.invalidateCache();
+    return tripId;
   }
 
   async getAvailable(driverId?: string): Promise<Trip[]> {
@@ -129,9 +142,13 @@ export class TripFirestoreRepository implements TripRepository {
   }
 
   async getById(tripId: string): Promise<Trip | null> {
-    const doc = await firestore.collection("trips").doc(tripId).get();
-    if (!doc.exists) return null;
-    return { id: doc.id, ...doc.data() } as Trip;
+    if (!tripId || typeof tripId !== "string" || !tripId.trim()) return null;
+
+    return TripFirestoreRepository.tripByIdCache.getOrLoad(tripId, async () => {
+      const doc = await firestore.collection("trips").doc(tripId).get();
+      if (!doc.exists) return null;
+      return { id: doc.id, ...doc.data() } as Trip;
+    });
   }
 
   async getDriverTripHistory(userId: string): Promise<Trip[]> {
@@ -203,6 +220,7 @@ export class TripFirestoreRepository implements TripRepository {
         });
       }
     });
+    TripFirestoreRepository.invalidateCache(tripId);
   }
 
   async acceptTrip(tripId: string, driverId: string): Promise<void> {
@@ -242,6 +260,7 @@ export class TripFirestoreRepository implements TripRepository {
         });
       }
     });
+    TripFirestoreRepository.invalidateCache(tripId);
   }
 
 
@@ -289,6 +308,7 @@ export class TripFirestoreRepository implements TripRepository {
         }
       }
     }
+    TripFirestoreRepository.invalidateCache(tripId);
   }
 
   async completeTrip(tripId: string): Promise<void> {
@@ -346,6 +366,7 @@ export class TripFirestoreRepository implements TripRepository {
         }
       }
     });
+    TripFirestoreRepository.invalidateCache(tripId);
   }
 
   async getByIdWithOrders(tripId: string): Promise<Trip & { orders: any[] }> {
@@ -368,14 +389,18 @@ export class TripFirestoreRepository implements TripRepository {
   }
 
   async getTripsByOrderId(orderId: string): Promise<Trip[]> {
-    const snapshot = await firestore
-      .collection("trips")
-      .where("orderIds", "array-contains", orderId)
-      .get();
+    if (!orderId || typeof orderId !== "string" || !orderId.trim()) return [];
 
-    return snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() } as Trip))
-      .filter((trip) => trip.status !== "canceled");
+    return TripFirestoreRepository.tripsByOrderCache.getOrLoad(orderId, async () => {
+      const snapshot = await firestore
+        .collection("trips")
+        .where("orderIds", "array-contains", orderId)
+        .get();
+
+      return snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as Trip))
+        .filter((trip) => trip.status !== "canceled");
+    });
   }
 
   async getDriverActiveTrip(driverId: string): Promise<Trip | null> {

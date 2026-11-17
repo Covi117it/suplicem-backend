@@ -74,7 +74,7 @@ function trimUserSummary(u: User): Partial<User> {
 }
 
 export class GetDashboardSummaryUseCase {
-  private static readonly summaryCache = new TtlCache<DashboardSummaryResult>(45_000);
+  private static readonly summaryCache = new TtlCache<DashboardSummaryResult>(45_000, 50);
 
   constructor(
     private orderRepo: OrderRepository,
@@ -91,18 +91,20 @@ export class GetDashboardSummaryUseCase {
     const cacheKey = isSeller ? `seller:${actor.uid}` : "admin";
 
     return GetDashboardSummaryUseCase.summaryCache.getOrLoad(cacheKey, async () => {
+      const orderFilter: any = isSeller ? { sellerId: actor.uid, limit: 150 } : { limit: 150 };
+
       const [orders, allTrips, users] = isSeller
         ? await Promise.all([
-            this.orderRepo.getAll({ sellerId: actor.uid }),
-            this.tripRepo.getAll(),
+            this.orderRepo.getAll(orderFilter),
+            this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
             Promise.all([
               this.userRepo.getAll({ userType: "client", sellerId: actor.uid }),
-              this.userRepo.getAll({ userType: "driver" }),
+              this.userRepo.getAll({ userType: "driver", status: "active" }),
             ]).then(([sellerClients, drivers]) => [...sellerClients, ...drivers]),
           ])
         : await Promise.all([
-            this.orderRepo.getAll(),
-            this.tripRepo.getAll(),
+            this.orderRepo.getAll(orderFilter),
+            this.tripRepo.getActiveTrips ? this.tripRepo.getActiveTrips() : this.tripRepo.getAll(),
             this.userRepo.getAll(),
           ]);
 

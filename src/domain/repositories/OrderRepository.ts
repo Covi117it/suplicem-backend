@@ -6,6 +6,7 @@ export interface OrderFilters {
   userId?: string;
   withoutTrip?: boolean;
   sellerId?: string;
+  limit?: number;
 }
 
 export interface OrderRepository {

@@ -2,8 +2,15 @@ import { firestore } from "../../config/firebase";
 import { Order } from "../../domain/entities/Order";
 import { OrderRepository, OrderFilters } from "../../domain/repositories/OrderRepository";
 import { FieldPath } from "firebase-admin/firestore";
+import { TtlCache } from "../cache/TtlCache";
 
 export class OrderFirestoreRepository implements OrderRepository {
+  private static readonly orderByIdCache = new TtlCache<Order | null>(15_000, 200);
+
+  public static invalidateCache(orderId?: string): void {
+    OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
+  }
+
   async create(
     order: Order
   ): Promise<{ orderId: string; orderNumber: number }> {
@@ -40,34 +47,38 @@ export class OrderFirestoreRepository implements OrderRepository {
   }
 
   async getById(orderId: string): Promise<Order | null> {
-    const doc = await firestore.collection("orders").doc(orderId).get();
-    if (!doc.exists) return null;
-    const orderData = { id: doc.id, ...doc.data() } as Order;
+    if (!orderId || typeof orderId !== "string" || !orderId.trim()) return null;
 
-    if (!orderData.deliveryAddress && orderData.deliveries && orderData.deliveries.length > 0) {
-      orderData.deliveryAddress = orderData.deliveries[0].address;
-    }
+    return OrderFirestoreRepository.orderByIdCache.getOrLoad(orderId, async () => {
+      const doc = await firestore.collection("orders").doc(orderId).get();
+      if (!doc.exists) return null;
+      const orderData = { id: doc.id, ...doc.data() } as Order;
 
-    if (orderData.userId) {
-      try {
-        const userDoc = await firestore
-          .collection("users")
-          .doc(orderData.userId)
-          .get();
-        if (userDoc.exists) {
-          const u = userDoc.data();
-          orderData.userPhone = u?.phone || orderData.userPhone || "";
-          orderData.userNames = u?.names || orderData.userNames || "";
-          orderData.userLastNames = u?.lastNames || orderData.userLastNames || "";
-          orderData.userEmail = u?.email || orderData.userEmail || "";
-          orderData.clientAddresses = u?.addresses || [];
-        }
-      } catch (e) {
-        console.warn(`Error al enriquecer orden ${orderId} con datos del usuario:`, e);
+      if (!orderData.deliveryAddress && orderData.deliveries && orderData.deliveries.length > 0) {
+        orderData.deliveryAddress = orderData.deliveries[0].address;
       }
-    }
 
-    return orderData;
+      if (orderData.userId) {
+        try {
+          const userDoc = await firestore
+            .collection("users")
+            .doc(orderData.userId)
+            .get();
+          if (userDoc.exists) {
+            const u = userDoc.data();
+            orderData.userPhone = u?.phone || orderData.userPhone || "";
+            orderData.userNames = u?.names || orderData.userNames || "";
+            orderData.userLastNames = u?.lastNames || orderData.userLastNames || "";
+            orderData.userEmail = u?.email || orderData.userEmail || "";
+            orderData.clientAddresses = u?.addresses || [];
+          }
+        } catch (e) {
+          console.warn(`Error al enriquecer orden ${orderId} con datos del usuario:`, e);
+        }
+      }
+
+      return orderData;
+    });
   }
 
   async getAll(filters?: OrderFilters | string): Promise<Order[]> {
@@ -92,7 +103,14 @@ export class OrderFirestoreRepository implements OrderRepository {
       query = query.where("sellerId", "==", parsedFilters.sellerId);
     }
 
-    const snapshot = await query.get();
+    const limitCount = parsedFilters.limit ? Math.min(parsedFilters.limit, 300) : 200;
+    let snapshot: FirebaseFirestore.QuerySnapshot;
+    try {
+      snapshot = await query.orderBy("createdAt", "desc").limit(limitCount).get();
+    } catch {
+      // Fallback seguro en caso de que falte un índice compuesto específico
+      snapshot = await query.limit(limitCount).get();
+    }
 
     const rawOrders: Order[] = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -239,6 +257,7 @@ export class OrderFirestoreRepository implements OrderRepository {
     }
 
     await firestore.collection("orders").doc(orderId).update(updateData);
+    OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
   }
 
     async markDeliveryAsCompleted(orderId: string, index: number): Promise<void> {
@@ -267,6 +286,7 @@ export class OrderFirestoreRepository implements OrderRepository {
         updatedAt: new Date().toISOString(),
       });
     });
+    OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
   }
 
   async completeDelivery(
@@ -306,6 +326,7 @@ export class OrderFirestoreRepository implements OrderRepository {
         updatedAt: new Date().toISOString(),
       });
     });
+    OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
   }
 
   async attachDeliveryProof(
@@ -343,6 +364,7 @@ export class OrderFirestoreRepository implements OrderRepository {
         updatedAt: new Date().toISOString(),
       });
     });
+    OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
   }
 
   async updateDeliveries(
@@ -493,6 +515,7 @@ export class OrderFirestoreRepository implements OrderRepository {
         deliveries: finalDeliveries,
         updatedAt: new Date().toISOString(),
       });
+      OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
       return {
         id: orderSnap.id,
         ...orderData,
@@ -507,5 +530,6 @@ export class OrderFirestoreRepository implements OrderRepository {
       receiptImage,
       updatedAt: new Date().toISOString(),
     });
+    OrderFirestoreRepository.orderByIdCache.invalidate(orderId);
   }
 }
