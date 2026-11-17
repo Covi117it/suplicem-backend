@@ -1,11 +1,13 @@
 import dotenv from "dotenv";
 dotenv.config();
+import http from "http";
 import express from "express";
 import cors from "cors";
 import compression from "compression";
 import { registerRoutes } from "./interfaces/http/routes";
 import { globalLimiter } from "./interfaces/http/middlewares/rateLimiter";
 import { errorHandler } from "./interfaces/http/middlewares/errorHandler";
+import { WebSocketServer } from "./infrastructure/websocket/WebSocketServer";
 
 export const startServer = () => {
   const app = express();
@@ -32,7 +34,12 @@ export const startServer = () => {
   app.use(errorHandler);
 
   const PORT = process.env.PORT || 3000;
-  app.listen(Number(PORT), "0.0.0.0", () => {
+  const server = http.createServer(app);
+
+  // Inicializar motor de WebSockets sobre el mismo servidor HTTP
+  WebSocketServer.init(server);
+
+  server.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
   });
 };
