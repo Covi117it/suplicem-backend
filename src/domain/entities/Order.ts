@@ -59,5 +59,5 @@ export interface Order {
   aiRiskReason?: string;
   sellerId?: string;
   createdBySellerId?: string;
-  
+  createdByAdminId?: string;
 }

@@ -57,7 +57,7 @@ export class CreateOrderUseCase {
       throw new Error("Repositorio de productos no disponible.");
     }
 
-    const isSellerAssisted = Boolean(data.createdBySellerId);
+    const isAssisted = Boolean(data.createdBySellerId || data.createdByAdminId);
     const validatedItems: OrderItem[] = [];
 
     for (const item of data.items) {
@@ -69,7 +69,7 @@ export class CreateOrderUseCase {
       const validatedItem = this.pricingService.validateAndCalculateItem(
         product,
         item.quantity,
-        isSellerAssisted
+        isAssisted
       );
       validatedItems.push(validatedItem);
     }
@@ -89,7 +89,7 @@ export class CreateOrderUseCase {
 
       // Aplicar políticas de negocio (SRP: Cartera de vendedor y elegibilidad de crédito)
       this.policyValidator.validateSellerPortfolio(client, data.createdBySellerId);
-      this.policyValidator.validateCreditEligibility(client, data.paymentMethod);
+      this.policyValidator.validateCreditEligibility(client, data.paymentMethod, Boolean(data.createdByAdminId));
 
       if (client) {
         userPhone = client.phone || "";
@@ -115,6 +115,7 @@ export class CreateOrderUseCase {
       userId: data.userId,
       sellerId: assignedSellerId,
       createdBySellerId: data.createdBySellerId,
+      createdByAdminId: data.createdByAdminId,
       userPhone,
       userNames,
       userLastNames,

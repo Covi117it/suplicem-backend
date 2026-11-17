@@ -24,16 +24,21 @@ export class OrderPolicyValidatorService {
 
   /**
    * Valida que si el método de pago es crédito, el cliente cuente obligatoriamente
-   * con un vendedor activo asignado a su cartera.
+   * con un vendedor activo asignado a su cartera, a menos que sea autorizado directamente
+   * por un administrador.
    */
-  validateCreditEligibility(client: User | null, paymentMethod?: "transfer" | "credit"): void {
+  validateCreditEligibility(
+    client: User | null,
+    paymentMethod?: "transfer" | "credit",
+    isAdminAuthorized: boolean = false
+  ): void {
     if (paymentMethod !== "credit") return;
 
     if (!client) {
       throw new Error("Cliente no identificado para validar la solicitud de financiamiento.");
     }
 
-    if (!client.sellerId || !client.sellerId.trim()) {
+    if (!isAdminAuthorized && (!client.sellerId || !client.sellerId.trim())) {
       throw new Error(
         "El pago a crédito está restringido: el cliente debe contar con un vendedor asignado a su cartera para optar por financiamiento."
       );

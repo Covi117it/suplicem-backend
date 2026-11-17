@@ -25,4 +25,5 @@ export interface CreateOrderDto {
   receiptImage?: string;
   idempotencyKey?: string;
   createdBySellerId?: string;
+  createdByAdminId?: string;
 }

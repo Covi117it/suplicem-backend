@@ -55,6 +55,7 @@ export const CreateOrderSchema = z
     creditNote: z.string().optional(),
     idempotencyKey: z.string().optional(),
     createdBySellerId: z.string().optional(),
+    createdByAdminId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (
@@ -68,8 +69,8 @@ export const CreateOrderSchema = z
       });
     }
 
-    // Regla de Negocio: Pedidos directos vs Venta Asistida de cemento
-    const isSellerAssisted = Boolean(data.createdBySellerId);
+    // Regla de Negocio: Pedidos directos vs Venta Asistida de cemento (vendedor o administración)
+    const isSellerAssisted = Boolean(data.createdBySellerId || data.createdByAdminId);
 
     data.items.forEach((item, index) => {
       const isCement = item.unit === "fundas" || (item.name && item.name.toLowerCase().includes("cemento"));

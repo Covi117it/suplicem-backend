@@ -66,9 +66,15 @@ export class OrderController {
 
       let orderUserId = authUser?.uid;
       let createdBySellerId: string | undefined = undefined;
+      let createdByAdminId: string | undefined = undefined;
 
       if (authUser?.userType === "seller") {
         createdBySellerId = authUser.uid;
+        if (req.body.userId && typeof req.body.userId === "string" && req.body.userId.trim()) {
+          orderUserId = req.body.userId.trim();
+        }
+      } else if (authUser?.userType === "admin") {
+        createdByAdminId = authUser.uid;
         if (req.body.userId && typeof req.body.userId === "string" && req.body.userId.trim()) {
           orderUserId = req.body.userId.trim();
         }
@@ -79,6 +85,7 @@ export class OrderController {
         receiptImage: receiptImageUrl,
         userId: orderUserId,
         createdBySellerId,
+        createdByAdminId,
         idempotencyKey,
       });
       res.status(201).json({ success: true, orderId, orderNumber });
