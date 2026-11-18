@@ -2,6 +2,7 @@ import { User } from "../../../domain/entities/User";
 import { UserRepository } from "../../../domain/repositories/UserRepository";
 import { ApplicationActor } from "../../dtos/UserDtos";
 import { NotificationDispatcherService } from "../../services/NotificationDispatcherService";
+import { normalizeDominicanPhone } from "../../../domain/services/PhoneService";
 
 export class UpdateUserUseCase {
   constructor(
@@ -37,7 +38,16 @@ export class UpdateUserUseCase {
     const sanitizedUpdate: Partial<User> = {};
     if (userToUpdate.names !== undefined) sanitizedUpdate.names = userToUpdate.names;
     if (userToUpdate.lastNames !== undefined) sanitizedUpdate.lastNames = userToUpdate.lastNames;
-    if (userToUpdate.phone !== undefined) sanitizedUpdate.phone = userToUpdate.phone;
+    if (userToUpdate.phone !== undefined) {
+      const normalizedPhone = normalizeDominicanPhone(userToUpdate.phone);
+      if (normalizedPhone !== existingUser.phone) {
+        const existingByPhone = await this.userRepo.getByPhone(normalizedPhone);
+        if (existingByPhone && existingByPhone.uid !== existingUser.uid) {
+          throw new Error("El número de teléfono ya se encuentra registrado por otro usuario");
+        }
+      }
+      sanitizedUpdate.phone = normalizedPhone;
+    }
     if (userToUpdate.addresses !== undefined) sanitizedUpdate.addresses = userToUpdate.addresses;
     if (userToUpdate.vehicle !== undefined) sanitizedUpdate.vehicle = userToUpdate.vehicle;
     if (userToUpdate.identificationImage !== undefined) {
