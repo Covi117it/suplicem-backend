@@ -52,12 +52,21 @@ export const CreateOrderSchema = z
     receiptImage: z.string().optional(),
     paymentMethod: z.enum(["transfer", "credit"]).optional(),
     bankAccountId: z.string().optional(),
+    bankReferenceNumber: z.string().trim().optional(),
     creditNote: z.string().optional(),
     idempotencyKey: z.string().optional(),
     createdBySellerId: z.string().optional(),
     createdByAdminId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.paymentMethod === "transfer" && (!data.bankReferenceNumber || data.bankReferenceNumber.length < 3)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El número de comprobante o referencia bancaria es obligatorio para pagos por transferencia.",
+        path: ["bankReferenceNumber"],
+      });
+    }
+
     if (
       data.deliveryType === "domicilio" &&
       (!data.deliveries || data.deliveries.length === 0)

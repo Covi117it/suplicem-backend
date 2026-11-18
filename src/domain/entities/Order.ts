@@ -40,6 +40,7 @@ export interface Order {
   items: OrderItem[];
   paymentMethod?: "transfer" | "credit"; 
   bankAccountId?: string; 
+  bankReferenceNumber?: string;
   creditNote?: string;
   comments?: string;
   receiptImage?: string;

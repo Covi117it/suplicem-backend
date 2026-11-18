@@ -81,6 +81,22 @@ export class OrderFirestoreRepository implements OrderRepository {
     });
   }
 
+  async findByBankReference(bankReference: string): Promise<Order | null> {
+    const cleanRef = (bankReference || "").trim();
+    if (!cleanRef) return null;
+
+    const snapshot = await firestore
+      .collection("orders")
+      .where("bankReferenceNumber", "==", cleanRef)
+      .where("status", "in", ["pending", "approved", "completed"])
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) return null;
+    const doc = snapshot.docs[0];
+    return { ...(doc.data() as Order), id: doc.id };
+  }
+
   async getAll(filters?: OrderFilters | string): Promise<Order[]> {
     let query: FirebaseFirestore.Query = firestore.collection("orders");
 

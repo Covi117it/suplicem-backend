@@ -40,7 +40,18 @@ export class CreateOrderUseCase {
       }
     }
 
-    // 2. Análisis de riesgo del comprobante con IA
+    // 2. Validación de Unicidad de Referencia Bancaria (Prevención de comprobante reciclado / doble gasto)
+    const rawBankRef = (data.bankReferenceNumber || "").trim();
+    if (rawBankRef) {
+      const existingOrder = await this.orderRepo.findByBankReference(rawBankRef);
+      if (existingOrder) {
+        throw new Error(
+          `El número de comprobante/referencia bancaria "${rawBankRef}" ya fue registrado en el pedido #${existingOrder.orderNumber}. Verifica tu comprobante o contacta a soporte.`
+        );
+      }
+    }
+
+    // 3. Análisis de riesgo del comprobante con IA
     let aiRiskFlag = false;
     let aiRiskScore = 0;
     let aiRiskReason = "";
@@ -52,7 +63,7 @@ export class CreateOrderUseCase {
       aiRiskReason = analysis.reason;
     }
 
-    // 3. Validación y Tarificación de Productos delegada a OrderPricingService
+    // 4. Validación y Tarificación de Productos delegada a OrderPricingService
     if (!this.productRepo) {
       throw new Error("Repositorio de productos no disponible.");
     }
@@ -134,6 +145,7 @@ export class CreateOrderUseCase {
       items: validatedItems,
       paymentMethod: data.paymentMethod,
       bankAccountId: data.bankAccountId,
+      bankReferenceNumber: rawBankRef || undefined,
       creditNote: data.creditNote,
       comments: data.comments || "",
       receiptImage: data.receiptImage,
