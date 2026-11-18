@@ -193,21 +193,30 @@ export class TripFirestoreRepository implements TripRepository {
       if (!tripDoc.exists) throw new Error("El viaje solicitado no existe");
 
       const tripData = tripDoc.data();
-      if (tripData?.status !== "available" && tripData?.status !== "assigned") {
-        if (tripData?.status === "accepted" && (tripData?.assignedDriverId === driverId || tripData?.driverId === driverId)) {
-          return;
-        }
-        throw new Error(`El viaje ${tripData?.tripNumber || tripId} no está disponible para asignación (estado: ${tripData?.status}).`);
+      const assignableStatuses = ["available", "assigned", "accepted", "canceled"];
+      if (!assignableStatuses.includes(tripData?.status)) {
+        throw new Error(
+          `El viaje ${tripData?.tripNumber || tripId} no está disponible para asignación (estado: ${tripData?.status}).`
+        );
       }
 
       const nowIso = new Date().toISOString();
-      transaction.update(tripRef, {
+      const tripUpdatePayload: any = {
         status: "accepted",
         assignedDriverId: driverId,
         driverId: driverId,
         assignedAt: nowIso,
         acceptedAt: nowIso,
-      });
+      };
+
+      if (tripData?.status === "canceled") {
+        if (tripData?.cancellationReason) {
+          tripUpdatePayload.previousCancellationReason = tripData.cancellationReason;
+        }
+        tripUpdatePayload.cancellationReason = null;
+      }
+
+      transaction.update(tripRef, tripUpdatePayload);
 
       const orderIds = tripData?.orderIds || [];
       for (const oId of orderIds) {
@@ -277,22 +286,55 @@ export class TripFirestoreRepository implements TripRepository {
         driverId: "",
       };
 
-      if (status === "canceled" && cancellationReason) {
-        tripUpdate.cancellationReason = cancellationReason;
+      if (status === "canceled") {
+        const cancellingDriver = tripData?.assignedDriverId || tripData?.driverId;
+        if (cancellingDriver) {
+          tripUpdate.canceledByDriverId = cancellingDriver;
+        }
+        tripUpdate.canceledAt = new Date().toISOString();
+        if (cancellationReason) {
+          tripUpdate.cancellationReason = cancellationReason;
+        }
       }
 
       await firestore.collection("trips").doc(tripId).update(tripUpdate);
 
       const orderIds = tripData?.orderIds || [];
       for (const oId of orderIds) {
-        // Al cancelar viaje, se limpia tripId en las órdenes para liberarlas
-        await firestore.collection("orders").doc(oId).update({
-          tripId: status === "canceled" ? null : tripId,
-          tripStatus: "available",
-          assignedDriverId: "",
-          driverId: "",
-          updatedAt: new Date().toISOString(),
-        });
+        // Verificar si la orden tiene OTROS viajes fraccionados en curso
+        const otherTripsSnap = await firestore
+          .collection("trips")
+          .where("orderIds", "array-contains", oId)
+          .get();
+
+        const activeSubTrips = otherTripsSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Trip))
+          .filter(
+            (t) =>
+              t.id !== tripId &&
+              ["accepted", "started", "in_progress", "assigned"].includes(t.status || "")
+          );
+
+        if (activeSubTrips.length > 0) {
+          // La orden aún tiene otros viajes activos; mantenerla vinculada al siguiente viaje activo
+          const nextActive = activeSubTrips[0];
+          await firestore.collection("orders").doc(oId).update({
+            tripId: nextActive.id,
+            tripStatus: nextActive.status,
+            assignedDriverId: nextActive.assignedDriverId || "",
+            driverId: nextActive.driverId || "",
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          // No quedan más viajes activos para esta orden
+          await firestore.collection("orders").doc(oId).update({
+            tripId: null,
+            tripStatus: "available",
+            assignedDriverId: "",
+            driverId: "",
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     } else {
       await firestore.collection("trips").doc(tripId).update({ status });

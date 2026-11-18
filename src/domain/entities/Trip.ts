@@ -17,4 +17,7 @@ export interface Trip {
   deliveryPin?: string;
   deliveryId?: string;
   destinationAddress?: Address;
+  canceledByDriverId?: string;
+  canceledAt?: string;
+  previousCancellationReason?: string;
 }

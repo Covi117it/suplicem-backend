@@ -53,8 +53,8 @@ export class UpdateTripStatusUseCase {
       available: ["accepted", "canceled", "started"],
       assigned: ["accepted", "canceled", "started", "available", "in_progress"],
       accepted: ["started", "in_progress", "available", "canceled"],
-      started: ["completed", "canceled", "available", "in_progress"],
-      in_progress: ["completed", "canceled", "available", "started"],
+      started: ["completed", "canceled", "in_progress"],
+      in_progress: ["completed", "canceled", "started"],
     };
 
     const allowed = allowedTransitions[currentStatus] || [];

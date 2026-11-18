@@ -20,8 +20,9 @@ export class TripQueryService {
     const tripData = { id: tripSnap.id, ...tripSnap.data() } as Trip;
     let driverData: any = null;
 
-    if (tripData.assignedDriverId) {
-      const driverSnap = await firestore.collection("users").doc(tripData.assignedDriverId).get();
+    const driverIdToFetch = tripData.assignedDriverId || (tripData as any).canceledByDriverId;
+    if (driverIdToFetch) {
+      const driverSnap = await firestore.collection("users").doc(driverIdToFetch).get();
       if (driverSnap.exists) {
         driverData = { id: driverSnap.id, ...driverSnap.data() };
       }
