@@ -36,6 +36,12 @@ export class UpdateUserStatusUseCase {
 
     const previousStatus = user.status;
     user.status = status;
+
+    // Generar código de conductor únicamente cuando el administrador aprueba la cuenta (pasa a activa)
+    if (user.userType === "driver" && status === "active" && !user.driverCode) {
+      user.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
+    }
+
     await this.userRepo.update(uid, user);
 
     // Sincronizar estado en Firebase Auth y revocar sesiones activas

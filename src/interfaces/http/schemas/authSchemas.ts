@@ -51,12 +51,8 @@ export const RegisterWithPhoneSchema = z.object({
       message: "identificationType debe ser Cedula o Pasaporte",
     })
   ),
-  userType: z
-    .enum(["client", "driver", "seller"], {
-      message: "userType debe ser client, driver o seller",
-    })
-    .optional()
-    .default("client"),
+  userType: z.literal("client").optional().default("client"),
+  identificationImage: z.string().optional(),
   personType: z
     .enum(["fisica", "juridica"], {
       message: "personType debe ser fisica o juridica",

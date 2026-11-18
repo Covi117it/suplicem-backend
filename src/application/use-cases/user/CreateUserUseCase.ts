@@ -136,6 +136,11 @@ export class CreateUserUseCase {
         identificationImageUrl = parsedData.identificationImage || parsedData.data?.identificationImage;
       }
 
+      // Obligatoriedad de foto de documento para personas físicas (clientes y choferes)
+      if (!isAuthorizedAdmin && !isAuthorizedSeller && !isJuridica && !identificationImageUrl) {
+        throw new Error("Debes adjuntar la foto de tu cédula o pasaporte para completar tu registro.");
+      }
+
       // Analizar la foto de la identificación con el filtro SynthID
       let aiRiskFlag = false;
       let aiRiskScore = 0;
@@ -188,7 +193,7 @@ export class CreateUserUseCase {
       if (parsedVehicle && userType === "driver") {
         userToSave.vehicle = parsedVehicle;
       }
-      if (userType === "driver") {
+      if (userType === "driver" && status === "active") {
         userToSave.driverCode = `COND-${uid.slice(0, 5).toUpperCase()}`;
       }
       if (effectiveCompanyRnc || isJuridica) {

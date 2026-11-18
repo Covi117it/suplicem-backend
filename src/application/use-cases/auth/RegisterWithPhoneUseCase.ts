@@ -10,6 +10,7 @@ import {
 } from "../../../domain/services/IdentityVerificationService";
 import { isValidRnc, normalizeTaxId } from "../../../domain/services/TaxIdService";
 import { User } from "../../../domain/entities/User";
+import { uploadIdentificationImage } from "../../../domain/services/ImageStorageService";
 
 const MAX_ATTEMPTS = 5;
 
@@ -21,12 +22,12 @@ export interface RegisterWithPhoneDto {
   lastNames: string;
   identification: string;
   identificationType: "Cedula" | "Pasaporte";
-  userType?: "client" | "driver" | "seller";
+  userType?: "client";
   personType?: "fisica" | "juridica";
   companyRnc?: string;
   companyName?: string;
   addresses?: User["addresses"];
-  vehicle?: User["vehicle"];
+  identificationImage?: string;
 }
 
 export class RegisterWithPhoneUseCase {
@@ -42,7 +43,7 @@ export class RegisterWithPhoneUseCase {
     return `phone_${digits}_${suffix}`;
   }
 
-  async execute(data: RegisterWithPhoneDto) {
+  async execute(data: RegisterWithPhoneDto, file?: Express.Multer.File) {
     const phone = normalizeDominicanPhone(data.phone);
     const challenge = await this.otpRepo.getByPhone(phone);
 
@@ -132,13 +133,13 @@ export class RegisterWithPhoneUseCase {
       );
     }
 
-    const userType = data.userType || "client";
+    const userType = "client";
     const personType = data.personType || "fisica";
     const rawCompanyRnc = (data.companyRnc || "").trim();
     const companyRnc = rawCompanyRnc ? normalizeTaxId(rawCompanyRnc) : "";
     const companyName = (data.companyName || "").trim();
 
-    const requiresCompany = personType === "juridica" || userType === "seller";
+    const requiresCompany = personType === "juridica";
     if (requiresCompany) {
       if (!companyRnc || !isValidRnc(companyRnc)) {
         throw new OtpError(
@@ -157,6 +158,22 @@ export class RegisterWithPhoneUseCase {
     }
 
     const uid = this.buildUid(phone);
+
+    // Validación estricta: La foto de la cédula o pasaporte es obligatoria para personas físicas
+    let identificationImageUrl = (data.identificationImage || "").trim();
+    if (file) {
+      const uploadResult = await uploadIdentificationImage(file, uid);
+      identificationImageUrl = uploadResult.url;
+    }
+
+    if (personType !== "juridica" && !identificationImageUrl) {
+      throw new OtpError(
+        "Debes adjuntar la foto de tu cédula o pasaporte para completar tu registro.",
+        400,
+        "IDENTIFICATION_IMAGE_REQUIRED"
+      );
+    }
+
     const customToken = await this.authService.createCustomToken(uid, { phone });
     const tokens = await this.authService.exchangeCustomToken(customToken);
 
@@ -164,11 +181,12 @@ export class RegisterWithPhoneUseCase {
       uid: tokens.uid || uid,
       identificationType,
       identification,
+      identificationImage: identificationImageUrl || undefined,
       email: (data.email || "").trim(),
       names,
       lastNames,
       phone,
-      userType,
+      userType: "client",
       personType,
       createdAt: new Date().toISOString(),
       status: "pending",
@@ -177,15 +195,9 @@ export class RegisterWithPhoneUseCase {
     if (data.addresses && Array.isArray(data.addresses) && data.addresses.length > 0) {
       userToSave.addresses = data.addresses;
     }
-    if (data.vehicle) {
-      userToSave.vehicle = data.vehicle;
-    }
     if (requiresCompany) {
       userToSave.companyRnc = companyRnc;
       userToSave.companyName = companyName;
-    }
-    if (userType === "driver") {
-      userToSave.driverCode = `COND-${userToSave.uid.slice(0, 5).toUpperCase()}`;
     }
 
     try {

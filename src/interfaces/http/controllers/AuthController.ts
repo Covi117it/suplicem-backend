@@ -80,7 +80,8 @@ export class AuthController {
 
   async registerWithPhone(req: Request, res: Response) {
     try {
-      const result = await this.registerWithPhoneUseCase.execute(req.body);
+      const file = req.file || (req.files && (req.files as Express.Multer.File[])[0]);
+      const result = await this.registerWithPhoneUseCase.execute(req.body, file);
       res.status(201).json(result);
     } catch (error: any) {
       res.status(error.statusCode || 400).json({
@@ -146,7 +147,7 @@ export class AuthController {
 
   async getCurrentUser(req: Request, res: Response) {
     try {
-      const uid = req.user?.uid;
+      const uid = (req as any).user?.uid;
       if (!uid) throw new Error("Usuario no autenticado");
 
       const user = await this.getCurrentUserUseCase.execute(uid);

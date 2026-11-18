@@ -42,9 +42,9 @@ export class UserFirestoreRepository implements UserRepository {
       const doc = await firestore.collection("users").doc(uid).get();
       if (!doc.exists) return null;
       const data = { ...(doc.data() as User) };
-      if (data.userType === "driver" && !data.driverCode) {
+      if (data.userType === "driver" && data.status === "active" && !data.driverCode) {
         data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
-      } else if (data.userType === "seller" && !data.sellerCode) {
+      } else if (data.userType === "seller" && data.status === "active" && !data.sellerCode) {
         data.sellerCode = `VEND-${doc.id.slice(0, 5).toUpperCase()}`;
       }
       return { ...data, uid: doc.id };
@@ -109,9 +109,9 @@ export class UserFirestoreRepository implements UserRepository {
       const snapshot = await query.get();
       return snapshot.docs.map((doc) => {
         const data = doc.data() as User;
-        if (data.userType === "driver" && !data.driverCode) {
+        if (data.userType === "driver" && data.status === "active" && !data.driverCode) {
           data.driverCode = `COND-${doc.id.slice(0, 5).toUpperCase()}`;
-        } else if (data.userType === "seller" && !data.sellerCode) {
+        } else if (data.userType === "seller" && data.status === "active" && !data.sellerCode) {
           data.sellerCode = `VEND-${doc.id.slice(0, 5).toUpperCase()}`;
         }
         return {

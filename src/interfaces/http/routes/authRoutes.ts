@@ -9,8 +9,15 @@ import {
   RegisterWithPhoneSchema,
 } from "../schemas/authSchemas";
 import { Router } from "express";
+import multer from "multer";
 import { AuthController } from "../controllers/AuthController";
 import { authenticate } from "../middlewares/authenticate";
+import { normalizeUserData } from "../middlewares/normalizeUserData";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB límite estricto
+});
 import {
   authLimiter,
   emailLimiter,
@@ -39,6 +46,8 @@ export const authRoutes = (router: Router) => {
   router.post(
     "/auth/register-phone",
     otpVerifyLimiter,
+    upload.any(),
+    normalizeUserData,
     validate(RegisterWithPhoneSchema),
     (req, res) => authController.registerWithPhone(req, res)
   );
