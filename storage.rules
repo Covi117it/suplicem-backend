@@ -1,10 +1,11 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Blindar totalmente Firebase Storage contra accesos directos de clientes.
-    // La subida y administración de archivos se realiza exclusivamente desde suplicem-backend.
+    // Blindar totalmente Firebase Storage contra accesos directos y scraping no autorizado.
+    // Toda la subida, eliminación y gestión se procesa exclusivamente desde suplicem-backend (Firebase Admin SDK).
+    // La visualización de imágenes opera mediante URLs firmadas con tokens de descarga criptográficos (?token=...).
     match /{allPaths=**} {
-      allow read: if true;
+      allow read: if false;
       allow write: if false;
     }
   }
