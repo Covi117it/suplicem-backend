@@ -88,6 +88,91 @@ export class TripFirestoreRepository implements TripRepository {
     return tripId;
   }
 
+  async createSplitTripsAtomic(
+    orderId: string,
+    tripsToCreate: Trip[],
+    tripIdsToCancel: string[]
+  ): Promise<string[]> {
+    const createdTripIds = await firestore.runTransaction(async (transaction) => {
+      // 1. Leer y validar orden
+      const orderRef = firestore.collection("orders").doc(orderId);
+      const orderSnap = await transaction.get(orderRef);
+      if (!orderSnap.exists) {
+        throw new Error(`La orden con ID ${orderId} no fue encontrada.`);
+      }
+      const orderData = orderSnap.data() as any;
+      if (orderData?.status !== "approved") {
+        throw new Error(`La orden #${orderData?.orderNumber || orderId} no está aprobada.`);
+      }
+
+      // 2. Cancelar viajes previos atómicamente
+      for (const cancelId of tripIdsToCancel) {
+        const cRef = firestore.collection("trips").doc(cancelId);
+        transaction.update(cRef, {
+          status: "canceled",
+          cancellationReason: "Reemplazado por nueva planificación fraccionada de viajes",
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // 3. Crear los nuevos viajes atómicamente
+      const ids: string[] = [];
+      const deliveries = (orderData?.deliveries || []).map((d: any) => ({ ...d }));
+
+      for (const trip of tripsToCreate) {
+        const tripRef = firestore.collection("trips").doc();
+        const newId = tripRef.id;
+        ids.push(newId);
+
+        transaction.set(tripRef, {
+          ...trip,
+          id: newId,
+          createdAt: trip.createdAt || new Date().toISOString(),
+        });
+
+        // Vincular con entregas si coincide deliveryId o asignar por capacidad
+        if (trip.deliveryId) {
+          const targetDel = deliveries.find((d: any) => d.id === trip.deliveryId);
+          if (targetDel) targetDel.tripId = newId;
+        } else {
+          let assignedTons = 0;
+          const targetTons = Number(trip.totalTons) || 0;
+          for (const del of deliveries) {
+            if (!del.tripId && del.status !== "delivered") {
+              const qty = Number(del.quantity) || 0;
+              const dName = (del.productName || del.name || "").toLowerCase();
+              const isSpecial =
+                dName.includes("blanco") ||
+                dName.includes("especial") ||
+                dName.includes("estructural") ||
+                dName.includes("40kg") ||
+                dName.includes("40 kg");
+              const factor = isSpecial ? 0.0400 : 0.0425;
+              const delTons = del.unit === "fundas" ? Number((qty * factor).toFixed(2)) : qty;
+
+              if (assignedTons + delTons <= targetTons + 0.5 || assignedTons === 0) {
+                del.tripId = newId;
+                assignedTons += delTons;
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Actualizar entregas y estado en la orden
+      transaction.update(orderRef, {
+        deliveries,
+        tripStatus: tripsToCreate.some((t) => t.assignedDriverId) ? "assigned" : "available",
+        updatedAt: new Date().toISOString(),
+      });
+
+      return ids;
+    });
+
+    TripFirestoreRepository.invalidateCache();
+    return createdTripIds;
+  }
+
   async getAvailable(driverId?: string): Promise<Trip[]> {
     const snapshot = await firestore
       .collection("trips")

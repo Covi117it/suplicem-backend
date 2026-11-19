@@ -96,22 +96,14 @@ export class SplitOrderTripsUseCase {
       );
     }
 
-    // 3. Cancelar viajes no iniciados previos (available o assigned)
+    // 3. Identificar viajes previos a cancelar
     const replaceableTrips = existingTrips.filter((t) =>
       ["available", "assigned", "accepted"].includes(t.status || "")
     );
-    for (const rTrip of replaceableTrips) {
-      if (rTrip.id) {
-        await this.tripRepo.updateTripStatus(
-          rTrip.id,
-          "canceled",
-          "Reemplazado por nueva planificación fraccionada de viajes"
-        );
-      }
-    }
+    const tripIdsToCancel = replaceableTrips.map((t) => t.id).filter(Boolean) as string[];
 
-    // 4. Crear los nuevos viajes atómicos
-    const createdTripIds: string[] = [];
+    // 4. Construir en memoria los nuevos viajes planificados
+    const tripsToCreate: Trip[] = [];
     const baseTripNumber = `TRIP-${order.orderNumber || orderId.slice(0, 5).toUpperCase()}`;
     const needsAutoDriver = trips.some((t) => !(t.driverId || "").trim());
     const driverContext =
@@ -124,8 +116,7 @@ export class SplitOrderTripsUseCase {
 
     for (let i = 0; i < trips.length; i++) {
       const tripData = trips[i];
-      const tripNumber =
-        trips.length > 1 ? `${baseTripNumber}-${i + 1}` : baseTripNumber;
+      const tripNumber = trips.length > 1 ? `${baseTripNumber}-${i + 1}` : baseTripNumber;
       const resolvedDriverId = await this.resolveDriverId(
         tripData.totalTons,
         tripData.driverId,
@@ -134,12 +125,10 @@ export class SplitOrderTripsUseCase {
       const isDriverAssigned = resolvedDriverId !== "";
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
-      const newTrip: Trip = {
+      tripsToCreate.push({
         tripNumber,
         orderIds: [orderId],
-        comments:
-          tripData.comments ||
-          `Viaje fraccionado ${i + 1} de ${trips.length} para la orden`,
+        comments: tripData.comments || `Viaje fraccionado ${i + 1} de ${trips.length} para la orden`,
         totalTons: Number(tripData.totalTons.toFixed(2)),
         status: isDriverAssigned ? "accepted" : "available",
         assignedDriverId: resolvedDriverId || undefined,
@@ -149,12 +138,23 @@ export class SplitOrderTripsUseCase {
         deliveryPin: generatedPin,
         deliveryId: tripData.deliveryId || undefined,
         destinationAddress: tripData.destinationAddress || undefined,
-      };
+      });
+    }
 
+    // 5. Ejecutar transacción atómica indivisible (Todo o Nada)
+    if (this.tripRepo.createSplitTripsAtomic) {
+      return await this.tripRepo.createSplitTripsAtomic(orderId, tripsToCreate, tripIdsToCancel);
+    }
+
+    // Fallback retrocompatible para mocks de pruebas unitarias
+    for (const cancelId of tripIdsToCancel) {
+      await this.tripRepo.updateTripStatus(cancelId, "canceled", "Reemplazado por nueva planificación fraccionada de viajes");
+    }
+    const createdTripIds: string[] = [];
+    for (const newTrip of tripsToCreate) {
       const newId = await this.tripRepo.createTripAtomic(newTrip, [orderId]);
       createdTripIds.push(newId);
     }
-
     return createdTripIds;
   }
 }
