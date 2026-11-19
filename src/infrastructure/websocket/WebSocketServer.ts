@@ -3,6 +3,9 @@ import { Server, Socket } from "socket.io";
 import { auth } from "../../config/firebase";
 import { LocationFirestoreRepository } from "../firestore/LocationFirestoreRepository";
 import { UserFirestoreRepository } from "../firestore/UserFirestoreRepository";
+import { TripFirestoreRepository } from "../firestore/TripFirestoreRepository";
+import { OrderFirestoreRepository } from "../firestore/OrderFirestoreRepository";
+import { TripAuthorizationService } from "../../application/services/TripAuthorizationService";
 
 export interface DriverLocationPayload {
   tripId: string;
@@ -16,6 +19,10 @@ export class WebSocketServer {
   private static io: Server | null = null;
   private static locationRepo = new LocationFirestoreRepository();
   private static userRepo = new UserFirestoreRepository();
+  private static tripAuthService = new TripAuthorizationService(
+    new TripFirestoreRepository(),
+    new OrderFirestoreRepository()
+  );
 
   public static init(httpServer: HttpServer): Server {
     if (this.io) return this.io;
@@ -60,11 +67,21 @@ export class WebSocketServer {
     this.io.on("connection", (socket: Socket) => {
       const user = socket.data.user;
 
-      // A. Cliente o Admin se une a la sala del viaje que está observando
-      socket.on("client:watch_trip", (tripId: string) => {
+      // A. Cliente, Vendedor o Admin se une a la sala validando autorización BOLA
+      socket.on("client:watch_trip", async (tripId: string) => {
         if (!tripId || typeof tripId !== "string") return;
-        const room = `trip:${tripId}`;
-        socket.join(room);
+
+        try {
+          const isAllowed = await this.tripAuthService.canUserWatchTrip(user, tripId);
+          if (!isAllowed) {
+            socket.emit("trip:error", { message: "No autorizado para ver este viaje" });
+            return;
+          }
+
+          socket.join(`trip:${tripId}`);
+        } catch (err) {
+          console.error("[WebSocket] Error validando watch_trip:", err);
+        }
       });
 
       // B. Cliente o Admin abandona la sala al cerrar el modal o cambiar de pantalla
@@ -73,29 +90,37 @@ export class WebSocketServer {
         socket.leave(`trip:${tripId}`);
       });
 
-      // C. Chofer transmite posición en vivo
+      // C. Chofer transmite posición en vivo validando que sea el chofer asignado
       socket.on("driver:location", async (payload: DriverLocationPayload) => {
+        if (!user || user.userType !== "driver") return;
         if (!payload || !payload.tripId) return;
         if (typeof payload.lat !== "number" || typeof payload.lng !== "number") return;
 
-        const driverId = user.uid;
-        const nowIso = new Date().toISOString();
+        try {
+          const canEmit = await this.tripAuthService.canDriverEmitLocation(user.uid, payload.tripId);
+          if (!canEmit) return;
 
-        // 1. Retransmisión instantánea en memoria RAM a los observadores de este viaje (< 10 ms)
-        socket.to(`trip:${payload.tripId}`).emit("trip:location_update", {
-          tripId: payload.tripId,
-          driverId,
-          lat: payload.lat,
-          lng: payload.lng,
-          latitude: payload.lat,
-          longitude: payload.lng,
-          speed: payload.speed || 0,
-          heading: payload.heading || 0,
-          updatedAt: nowIso,
-        });
+          const driverId = user.uid;
+          const nowIso = new Date().toISOString();
 
-        // 2. Mantener en sincronía el buffer de memoria existente (persiste a BD solo cada 20s)
-        this.locationRepo.update(driverId, payload.lat, payload.lng).catch(() => {});
+          // 1. Retransmisión instantánea en memoria RAM a los observadores de este viaje (< 10 ms)
+          socket.to(`trip:${payload.tripId}`).emit("trip:location_update", {
+            tripId: payload.tripId,
+            driverId,
+            lat: payload.lat,
+            lng: payload.lng,
+            latitude: payload.lat,
+            longitude: payload.lng,
+            speed: payload.speed || 0,
+            heading: payload.heading || 0,
+            updatedAt: nowIso,
+          });
+
+          // 2. Mantener en sincronía el buffer de memoria existente (persiste a BD solo cada 20s)
+          this.locationRepo.update(driverId, payload.lat, payload.lng).catch(() => {});
+        } catch (err) {
+          console.error("[WebSocket] Error procesando driver:location:", err);
+        }
       });
 
       socket.on("disconnect", () => {
