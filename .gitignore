@@ -30,8 +30,13 @@ Thumbs.db
 # Credentials & Service Keys
 keys.json
 keys*.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+*.pem
+*.key
 src/config/keys.json
 src/config/keys*.json
+src/config/*adminsdk*.json
 !keys.json.example
 
 # Temp / Scratch scripts
